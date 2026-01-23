@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { format } from 'date-fns';
 import { Settings, Sparkles, Bot, LogOut, Menu, X } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
+import { useAutoSync } from '../hooks/useAutoSync';
 import { TodayHeader } from './TodayHeader';
 import { FocusLineInput } from './FocusLineInput';
 import { CalendarWidget } from './CalendarWidget';
@@ -33,6 +35,9 @@ export function Dashboard() {
   const { user, logout } = useAuth();
   const [agentPanelOpen, setAgentPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Auto-sync data when changes occur
+  useAutoSync();
 
   // Initialize with sample data if empty
   useEffect(() => {
@@ -83,7 +88,10 @@ export function Dashboard() {
               )}
               {settings.computerAccessEnabled && (
                 <button
-                  onClick={() => setAgentPanelOpen(true)}
+                  onClick={() => {
+                    console.log('Bot icon clicked, opening AgentPanel');
+                    setAgentPanelOpen(true);
+                  }}
                   className="btn-ghost p-2 rounded-lg relative"
                   aria-label="Agent Assistant"
                   title="Agent Assistant"
@@ -206,7 +214,31 @@ export function Dashboard() {
       {journalEditorOpen && <JournalEditor />}
 
       {/* Agent Panel */}
-      {agentPanelOpen && <AgentPanel onClose={() => setAgentPanelOpen(false)} />}
+      {agentPanelOpen && console.log('agentPanelOpen is true, rendering AgentPanel')}
+      {agentPanelOpen && (
+        <ErrorBoundary
+          fallback={
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
+              <div className="bg-cream p-6 rounded-xl max-w-md">
+                <h3 className="font-display text-lg font-semibold text-red-600 mb-2">
+                  Agent Panel Error
+                </h3>
+                <p className="font-ui text-sm text-ink-muted mb-4">
+                  Something went wrong loading the Agent Panel. Check the browser console for details.
+                </p>
+                <button
+                  onClick={() => setAgentPanelOpen(false)}
+                  className="btn btn-primary text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <AgentPanel onClose={() => setAgentPanelOpen(false)} />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

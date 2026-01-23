@@ -14,6 +14,7 @@ import type {
   UserSettings,
   WeeklyInsight,
 } from '../types';
+import { syncService } from '../services/syncService';
 
 interface DashboardStore {
   // Data
@@ -75,6 +76,14 @@ interface DashboardStore {
   setSelectedDate: (date: string) => void;
   setJournalEditorOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+
+  // Sync State & Actions
+  syncEnabled: boolean;
+  syncStatus: 'idle' | 'syncing' | 'error';
+  lastSyncedAt: string | null;
+  setSyncEnabled: (enabled: boolean, userId?: string) => void;
+  syncToServer: () => Promise<void>;
+  loadFromServer: () => Promise<void>;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -431,6 +440,74 @@ export const useDashboardStore = create<DashboardStore>()(
       setSelectedDate: (date) => set({ selectedDate: date }),
       setJournalEditorOpen: (open) => set({ journalEditorOpen: open }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+      // Sync State & Actions
+      syncEnabled: false,
+      syncStatus: 'idle',
+      lastSyncedAt: null,
+
+      setSyncEnabled: (enabled, userId) => {
+        if (enabled && userId) {
+          syncService.setUserId(userId);
+        } else if (!enabled) {
+          syncService.setUserId(null);
+        }
+        set({ syncEnabled: enabled });
+      },
+
+      syncToServer: async () => {
+        const state = get();
+        if (!state.syncEnabled) return;
+
+        set({ syncStatus: 'syncing' });
+        try {
+          const success = await syncService.pushToServer({
+            habits: state.habits,
+            habitCompletions: state.habitCompletions,
+            journalEntries: state.journalEntries,
+            focusLines: state.focusLines,
+            settings: state.settings,
+            interestAreas: state.interestAreas,
+          });
+
+          if (success) {
+            set({
+              syncStatus: 'idle',
+              lastSyncedAt: new Date().toISOString(),
+            });
+          } else {
+            set({ syncStatus: 'error' });
+          }
+        } catch {
+          set({ syncStatus: 'error' });
+        }
+      },
+
+      loadFromServer: async () => {
+        const state = get();
+        if (!state.syncEnabled) return;
+
+        set({ syncStatus: 'syncing' });
+        try {
+          const data = await syncService.fetchFromServer();
+          if (data) {
+            set({
+              habits: data.habits as Habit[],
+              habitCompletions: data.habitCompletions as HabitCompletion[],
+              journalEntries: data.journalEntries as JournalEntry[],
+              focusLines: data.focusLines as FocusLine[],
+              interestAreas: data.interestAreas as InterestArea[],
+              settings: data.settings as UserSettings || state.settings,
+              syncStatus: 'idle',
+              lastSyncedAt: data.syncedAt,
+            });
+          } else {
+            set({ syncStatus: 'error' });
+          }
+        } catch {
+          set({ syncStatus: 'error' });
+        }
+      },
     }),
     {
       name: 'daily-dashboard-storage',
@@ -444,6 +521,7 @@ export const useDashboardStore = create<DashboardStore>()(
         dailyBriefs: state.dailyBriefs,
         weeklyInsights: state.weeklyInsights,
         settings: state.settings,
+        syncEnabled: state.syncEnabled,
       }),
     }
   )

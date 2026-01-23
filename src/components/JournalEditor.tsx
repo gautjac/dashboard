@@ -52,6 +52,8 @@ export function JournalEditor() {
     addJournalEntry,
     updateJournalEntry,
     setJournalEditorOpen,
+    habits,
+    setHabitValue,
   } = useDashboardStore();
 
   const {
@@ -73,6 +75,9 @@ export function JournalEditor() {
   const [showPrompt, setShowPrompt] = useState(!todayEntry?.content);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Calculate word count
+  const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
 
   // Focus textarea on open
   useEffect(() => {
@@ -110,6 +115,14 @@ export function JournalEditor() {
       updateJournalEntry(todayEntry.id, entryData);
     } else {
       addJournalEntry(entryData);
+    }
+
+    // Update "write" habit with word count
+    const writeHabit = habits.find(
+      (h) => h.name.toLowerCase() === 'write' && h.targetType === 'numeric'
+    );
+    if (writeHabit) {
+      setHabitValue(writeHabit.id, wordCount);
     }
 
     setLastSaved(new Date());
@@ -408,6 +421,9 @@ export function JournalEditor() {
                 <Wand2 className="w-4 h-4" />
               </button>
             )}
+            <span className="font-ui text-xs text-ink-muted">
+              {wordCount} {wordCount === 1 ? 'word' : 'words'}
+            </span>
             {lastSaved && (
               <span className="flex items-center gap-1.5 font-ui text-xs text-ink-muted">
                 <Clock className="w-3 h-3" />

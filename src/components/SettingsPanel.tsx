@@ -15,18 +15,21 @@ import {
   LogOut,
   Loader2,
   ExternalLink,
+  Cloud,
+  CloudOff,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 
-type SettingsTab = 'general' | 'calendar' | 'ai' | 'interests' | 'privacy';
+type SettingsTab = 'general' | 'calendar' | 'ai' | 'interests' | 'sync' | 'privacy';
 
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Settings className="w-4 h-4" /> },
   { id: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
   { id: 'ai', label: 'AI & Analysis', icon: <Brain className="w-4 h-4" /> },
   { id: 'interests', label: 'Interests', icon: <Newspaper className="w-4 h-4" /> },
+  { id: 'sync', label: 'Sync', icon: <Cloud className="w-4 h-4" /> },
   { id: 'privacy', label: 'Privacy', icon: <Shield className="w-4 h-4" /> },
 ];
 
@@ -36,7 +39,17 @@ export function SettingsPanel() {
     updateSettings,
     setSettingsOpen,
     interestAreas,
+    habits,
+    updateHabit,
+    syncEnabled,
+    syncStatus,
+    lastSyncedAt,
+    setSyncEnabled,
+    syncToServer,
+    loadFromServer,
   } = useDashboardStore();
+
+  const [syncUserId, setSyncUserId] = useState('');
 
   const {
     isConfigured,
@@ -212,6 +225,40 @@ export function SettingsPanel() {
                     <option value="gratitude">Gratitude</option>
                   </select>
                 </div>
+
+                {/* Daily word target */}
+                {(() => {
+                  const writeHabit = habits.find(
+                    (h) => h.name.toLowerCase() === 'write' && h.targetType === 'numeric'
+                  );
+                  if (!writeHabit) return null;
+                  return (
+                    <div>
+                      <label className="font-ui text-sm font-medium text-ink block mb-2">
+                        Daily writing goal
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={writeHabit.targetValue || 0}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value, 10);
+                            if (!isNaN(value) && value >= 0) {
+                              updateHabit(writeHabit.id, { targetValue: value });
+                            }
+                          }}
+                          className="input w-32"
+                        />
+                        <span className="font-ui text-sm text-ink-muted">words</span>
+                      </div>
+                      <p className="font-ui text-xs text-ink-muted mt-2">
+                        Your journal word count will auto-update this habit when you save
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -528,6 +575,141 @@ export function SettingsPanel() {
                     <option value="medium">Medium (5-8 items)</option>
                     <option value="long">Long (8-12 items)</option>
                   </select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'sync' && (
+              <div className="space-y-6">
+                {/* Sync status */}
+                <div className="flex items-center justify-between p-4 rounded-lg bg-parchment border border-warm-gray-dark">
+                  <div className="flex items-center gap-3">
+                    {syncEnabled ? (
+                      <div className="w-10 h-10 rounded-lg bg-sage-light flex items-center justify-center">
+                        <Cloud className="w-5 h-5 text-sage-dark" />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-warm-gray flex items-center justify-center">
+                        <CloudOff className="w-5 h-5 text-ink-muted" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-ui text-sm font-medium text-ink">
+                        {syncEnabled ? 'Sync enabled' : 'Sync disabled'}
+                      </p>
+                      {syncEnabled && lastSyncedAt && (
+                        <p className="font-ui text-xs text-ink-muted">
+                          Last synced: {new Date(lastSyncedAt).toLocaleString()}
+                        </p>
+                      )}
+                      {syncStatus === 'syncing' && (
+                        <p className="font-ui text-xs text-sage-dark flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Syncing...
+                        </p>
+                      )}
+                      {syncStatus === 'error' && (
+                        <p className="font-ui text-xs text-red-600">
+                          Sync failed. Check your connection.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {syncEnabled && (
+                    <button
+                      onClick={() => syncToServer()}
+                      disabled={syncStatus === 'syncing'}
+                      className="btn btn-secondary text-sm disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                      Sync now
+                    </button>
+                  )}
+                </div>
+
+                {/* Enable/disable sync */}
+                {!syncEnabled ? (
+                  <div className="space-y-4">
+                    <p className="font-ui text-sm text-ink-muted">
+                      Enable cloud sync to access your data across all your devices.
+                    </p>
+                    <div>
+                      <label className="font-ui text-sm font-medium text-ink block mb-2">
+                        User ID
+                      </label>
+                      <input
+                        type="text"
+                        value={syncUserId}
+                        onChange={(e) => setSyncUserId(e.target.value)}
+                        placeholder="Enter a unique ID (e.g., your email)"
+                        className="input w-full"
+                      />
+                      <p className="font-ui text-xs text-ink-muted mt-2">
+                        Use the same ID on all devices to sync your data.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (syncUserId.trim()) {
+                          setSyncEnabled(true, syncUserId.trim());
+                          loadFromServer();
+                        }
+                      }}
+                      disabled={!syncUserId.trim()}
+                      className="btn btn-primary text-sm disabled:opacity-50"
+                    >
+                      <Cloud className="w-4 h-4" />
+                      Enable sync
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="font-ui text-sm font-medium text-ink block">
+                          Pull from cloud
+                        </label>
+                        <p className="font-ui text-xs text-ink-muted mt-0.5">
+                          Download your data from the cloud
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => loadFromServer()}
+                        disabled={syncStatus === 'syncing'}
+                        className="btn btn-secondary text-sm disabled:opacity-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        Pull
+                      </button>
+                    </div>
+
+                    <div className="p-4 rounded-lg border border-red-200 bg-red-50">
+                      <div className="flex items-start gap-3">
+                        <CloudOff className="w-5 h-5 text-red-500 flex-shrink-0" />
+                        <div>
+                          <label className="font-ui text-sm font-medium text-red-700 block">
+                            Disable sync
+                          </label>
+                          <p className="font-ui text-xs text-red-600 mt-0.5 mb-3">
+                            Your data will only be stored locally on this device.
+                          </p>
+                          <button
+                            onClick={() => setSyncEnabled(false)}
+                            className="btn text-sm bg-red-500 text-white hover:bg-red-600"
+                          >
+                            Disable sync
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-3 rounded-lg bg-warm-gray/30">
+                  <p className="font-ui text-xs text-ink-muted">
+                    Your data is synced to a secure Neon PostgreSQL database. Use the same User ID
+                    on all devices to keep your data in sync.
+                  </p>
                 </div>
               </div>
             )}

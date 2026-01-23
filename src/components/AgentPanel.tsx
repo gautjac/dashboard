@@ -342,12 +342,17 @@ export function AgentPanel({ onClose }: AgentPanelProps) {
       />
 
       {/* Panel */}
-      <motion.div
-        initial={{ opacity: 0, x: 100 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 100 }}
-        transition={{ duration: 0.2 }}
-        className="relative w-full max-w-lg h-full bg-cream shadow-lifted overflow-y-auto"
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          width: '100%',
+          maxWidth: '32rem',
+          height: '100%',
+          backgroundColor: '#FFFEF9',
+          boxShadow: '0 4px 16px rgba(28, 25, 23, 0.08), 0 12px 32px rgba(28, 25, 23, 0.06)',
+          overflowY: 'auto',
+        }}
       >
         <div className="p-6">
           {/* Header */}
@@ -606,7 +611,7 @@ export function AgentPanel({ onClose }: AgentPanelProps) {
             </div>
           )}
         </div>
-      </motion.div>
+      </div>
     </motion.div>
   );
 }
