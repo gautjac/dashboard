@@ -188,7 +188,8 @@ export function JournalEditor() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.98 }}
         transition={{ duration: 0.2 }}
-        className="relative w-full max-w-2xl bg-cream rounded-2xl shadow-lifted overflow-hidden"
+        className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden"
+        style={{ width: '95vw', maxWidth: '672px' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-warm-gray/50">
