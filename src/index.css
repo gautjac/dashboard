@@ -1,0 +1,566 @@
+/* Google Fonts Import - Must be first */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&display=swap');
+
+@import "tailwindcss";
+
+/* Editorial Minimal Design System */
+/* Inspired by morning newspapers meets Japanese minimalism */
+
+@theme {
+  /* Color Palette - Warm, Calming, Editorial */
+  --color-parchment: #FAF8F5;
+  --color-parchment-dark: #F5F2ED;
+  --color-ink: #1C1917;
+  --color-ink-light: #44403C;
+  --color-ink-muted: #78716C;
+  --color-ink-faint: #A8A29E;
+  --color-terracotta: #C4785B;
+  --color-terracotta-light: #E8B4A0;
+  --color-terracotta-dark: #9A5D47;
+  --color-sage: #8B9D83;
+  --color-sage-light: #C4D1BF;
+  --color-sage-dark: #6B7A64;
+  --color-cream: #FFFEF9;
+  --color-warm-gray: #E7E5E4;
+  --color-warm-gray-dark: #D6D3D1;
+
+  /* Typography Scale */
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Source Serif 4", Georgia, serif;
+  --font-ui: "DM Sans", system-ui, sans-serif;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+
+  /* Animation */
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Shadows - Subtle, Paper-like */
+  --shadow-soft: 0 1px 3px rgba(28, 25, 23, 0.04), 0 4px 12px rgba(28, 25, 23, 0.03);
+  --shadow-medium: 0 2px 8px rgba(28, 25, 23, 0.06), 0 8px 24px rgba(28, 25, 23, 0.04);
+  --shadow-lifted: 0 4px 16px rgba(28, 25, 23, 0.08), 0 12px 32px rgba(28, 25, 23, 0.06);
+}
+
+/* Base Styles */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-parchment);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* Typography Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-ui {
+  font-family: var(--font-ui);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-warm-gray-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--color-terracotta-light);
+  color: var(--color-ink);
+}
+
+/* Focus States for Accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s var(--ease-smooth) forwards;
+}
+
+.animate-slide-in {
+  animation: slideInFromLeft 0.3s var(--ease-smooth) forwards;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.2s var(--ease-smooth) forwards;
+}
+
+/* Stagger children animations */
+.stagger-children > * {
+  opacity: 0;
+  animation: fadeIn 0.4s var(--ease-smooth) forwards;
+}
+
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-children > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(8) { animation-delay: 350ms; }
+
+/* Texture Overlay - Subtle paper grain */
+.paper-texture {
+  position: relative;
+}
+
+.paper-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* Card styles */
+.card {
+  background: var(--color-cream);
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(28, 25, 23, 0.04);
+  transition: box-shadow 0.2s var(--ease-smooth), transform 0.2s var(--ease-smooth);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-medium);
+}
+
+.card-interactive:hover {
+  transform: translateY(-1px);
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-warm-gray-dark) 20%,
+    var(--color-warm-gray-dark) 80%,
+    transparent
+  );
+}
+
+/* Editorial underline */
+.editorial-underline {
+  position: relative;
+  display: inline-block;
+}
+
+.editorial-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--color-terracotta);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s var(--ease-smooth);
+}
+
+.editorial-underline:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* Button base */
+.btn {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-smooth);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--color-ink);
+  color: var(--color-parchment);
+}
+
+.btn-primary:hover {
+  background: var(--color-ink-light);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-warm-gray-dark);
+}
+
+.btn-secondary:hover {
+  background: var(--color-warm-gray);
+  border-color: var(--color-ink-faint);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-ink-light);
+}
+
+.btn-ghost:hover {
+  background: var(--color-warm-gray);
+  color: var(--color-ink);
+}
+
+/* Input base */
+.input {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-warm-gray-dark);
+  border-radius: 8px;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  transition: border-color 0.15s var(--ease-smooth), box-shadow 0.15s var(--ease-smooth);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-terracotta);
+  box-shadow: 0 0 0 3px var(--color-terracotta-light);
+}
+
+.input::placeholder {
+  color: var(--color-ink-faint);
+}
+
+/* Checkbox custom */
+.checkbox-custom {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-warm-gray-dark);
+  border-radius: 4px;
+  background: var(--color-cream);
+  cursor: pointer;
+  transition: all 0.15s var(--ease-smooth);
+  position: relative;
+}
+
+.checkbox-custom:hover {
+  border-color: var(--color-ink-faint);
+}
+
+.checkbox-custom:checked {
+  background: var(--color-terracotta);
+  border-color: var(--color-terracotta);
+}
+
+.checkbox-custom:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 6px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Badge */
+.badge {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.badge-terracotta {
+  background: var(--color-terracotta-light);
+  color: var(--color-terracotta-dark);
+}
+
+.badge-sage {
+  background: var(--color-sage-light);
+  color: var(--color-sage-dark);
+}
+
+.badge-neutral {
+  background: var(--color-warm-gray);
+  color: var(--color-ink-light);
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 4px;
+  background: var(--color-warm-gray);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--color-terracotta);
+  border-radius: 2px;
+  transition: width 0.4s var(--ease-smooth);
+}
+
+/* Tooltip */
+.tooltip {
+  position: relative;
+}
+
+.tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 0.5rem 0.75rem;
+  background: var(--color-ink);
+  color: var(--color-parchment);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0.15s;
+}
+
+.tooltip:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ================================
+   RESPONSIVE STYLES
+   ================================ */
+
+/* Mobile-first adjustments */
+@media (max-width: 639px) {
+  html {
+    font-size: 15px;
+  }
+
+  /* Reduce card padding on mobile */
+  .card {
+    border-radius: 10px;
+  }
+
+  /* Touch-friendly tap targets */
+  .btn {
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+  }
+
+  /* Larger touch targets for checkboxes */
+  .checkbox-custom {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Full-width inputs on mobile */
+  .input {
+    padding: 0.875rem 1rem;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  /* Adjust badge size */
+  .badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  /* Hide scrollbar on mobile for cleaner look */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Card interactions - no hover transforms on touch */
+  .card:hover,
+  .card-interactive:hover {
+    transform: none;
+  }
+
+  /* Stack grid on mobile */
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Compact headers on mobile */
+  .mobile-compact-header {
+    padding: 0.75rem;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Two-column layout for tablet */
+  .tablet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+  body {
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
+  }
+
+  /* Fixed elements need safe area padding */
+  nav, footer {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+}
+
+/* Bottom safe area for fixed footers */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  footer {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark mode support (for future) */
+@media (prefers-color-scheme: dark) {
+  /* Dark mode variables - ready for implementation */
+  .dark-mode {
+    --color-parchment: #1C1917;
+    --color-parchment-dark: #0F0E0D;
+    --color-ink: #FAF8F5;
+    --color-ink-light: #D6D3D1;
+    --color-ink-muted: #A8A29E;
+    --color-ink-faint: #78716C;
+    --color-cream: #292524;
+    --color-warm-gray: #44403C;
+    --color-warm-gray-dark: #57534E;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: black;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+}
