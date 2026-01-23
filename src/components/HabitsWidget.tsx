@@ -13,9 +13,11 @@ import {
   Pencil,
   Moon,
   Brain,
+  CalendarDays,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
+import { HabitHistoryModal } from './HabitHistoryModal';
 import type { HabitWithStats } from '../types';
 
 // Icon mapping
@@ -260,6 +262,8 @@ export function HabitsWidget() {
     setHabitValue,
   } = useDashboardStore();
 
+  const [showHistory, setShowHistory] = useState(false);
+
   const habitsWithStats = getHabitsWithStats();
   const completedCount = habitsWithStats.filter((h) => h.todayCompleted).length;
   const totalCount = habitsWithStats.length;
@@ -280,9 +284,18 @@ export function HabitsWidget() {
             Today's Habits
           </h3>
         </div>
-        <button className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink">
-          <Plus className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowHistory(true)}
+            className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-terracotta"
+            title="View 30-day history"
+          >
+            <CalendarDays className="w-4 h-4" />
+          </button>
+          <button className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink">
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Progress overview */}
@@ -349,6 +362,11 @@ export function HabitsWidget() {
           </p>
         </motion.div>
       )}
+
+      {/* History Modal */}
+      <AnimatePresence>
+        {showHistory && <HabitHistoryModal onClose={() => setShowHistory(false)} />}
+      </AnimatePresence>
     </motion.div>
   );
 }
