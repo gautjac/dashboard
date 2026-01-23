@@ -106,7 +106,7 @@ export function SettingsPanel() {
       >
         <div className="flex h-full" style={{ maxHeight: '85vh' }}>
           {/* Sidebar */}
-          <div className="w-14 sm:w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-2 sm:p-4">
+          <div className="w-14 sm:w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-2 sm:p-4 overflow-y-auto">
             <h2 className="hidden sm:block font-display text-xl font-semibold text-ink mb-4 px-2">
               Settings
             </h2>
