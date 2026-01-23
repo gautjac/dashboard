@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { format } from 'date-fns';
 import { Settings, Sparkles, Bot, LogOut, Menu, X } from 'lucide-react';
@@ -88,10 +88,7 @@ export function Dashboard() {
               )}
               {settings.computerAccessEnabled && (
                 <button
-                  onClick={() => {
-                    console.log('Bot icon clicked, opening AgentPanel');
-                    setAgentPanelOpen(true);
-                  }}
+                  onClick={() => setAgentPanelOpen(true)}
                   className="btn-ghost p-2 rounded-lg relative"
                   aria-label="Agent Assistant"
                   title="Agent Assistant"
@@ -214,7 +211,6 @@ export function Dashboard() {
       {journalEditorOpen && <JournalEditor />}
 
       {/* Agent Panel */}
-      {agentPanelOpen && console.log('agentPanelOpen is true, rendering AgentPanel')}
       {agentPanelOpen && (
         <ErrorBoundary
           fallback={
