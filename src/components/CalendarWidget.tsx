@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { format, parseISO, isAfter, isBefore } from 'date-fns';
+import { useMemo, useState } from 'react';
+import { format, parseISO, isAfter, isBefore, addHours } from 'date-fns';
 import {
   Calendar,
   Clock,
@@ -8,8 +8,10 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
+  Plus,
+  X,
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import type { CalendarEvent } from '../types';
@@ -99,6 +101,159 @@ function EventItem({ event, isNow, isPast }: EventItemProps) {
   );
 }
 
+interface NewEventFormProps {
+  onSubmit: (params: {
+    title: string;
+    start: Date;
+    end: Date;
+    allDay: boolean;
+    location?: string;
+  }) => Promise<void>;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+function NewEventForm({ onSubmit, onCancel, isLoading }: NewEventFormProps) {
+  const now = new Date();
+  const roundedNow = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    now.getHours() + 1,
+    0
+  );
+
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(format(roundedNow, 'yyyy-MM-dd'));
+  const [startTime, setStartTime] = useState(format(roundedNow, 'HH:mm'));
+  const [endTime, setEndTime] = useState(format(addHours(roundedNow, 1), 'HH:mm'));
+  const [allDay, setAllDay] = useState(false);
+  const [location, setLocation] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    const startDate = allDay
+      ? new Date(`${date}T00:00:00`)
+      : new Date(`${date}T${startTime}`);
+    const endDate = allDay
+      ? new Date(`${date}T23:59:59`)
+      : new Date(`${date}T${endTime}`);
+
+    await onSubmit({
+      title: title.trim(),
+      start: startDate,
+      end: endDate,
+      allDay,
+      location: location.trim() || undefined,
+    });
+  };
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      onSubmit={handleSubmit}
+      className="bg-warm-gray/30 rounded-lg p-4 space-y-3"
+    >
+      <div className="flex items-center justify-between">
+        <h4 className="font-ui text-sm font-medium text-ink">New Event</h4>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="p-1 rounded hover:bg-warm-gray"
+        >
+          <X className="w-4 h-4 text-ink-muted" />
+        </button>
+      </div>
+
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Event title"
+        className="input w-full text-sm"
+        autoFocus
+        required
+      />
+
+      <div className="flex items-center gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="input flex-1 text-sm"
+          required
+        />
+        <label className="flex items-center gap-2 font-ui text-sm text-ink-muted whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={allDay}
+            onChange={(e) => setAllDay(e.target.checked)}
+            className="checkbox-custom"
+          />
+          All day
+        </label>
+      </div>
+
+      {!allDay && (
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={startTime}
+            onChange={(e) => setStartTime(e.target.value)}
+            className="input flex-1 text-sm"
+            required
+          />
+          <span className="text-ink-muted">to</span>
+          <input
+            type="time"
+            value={endTime}
+            onChange={(e) => setEndTime(e.target.value)}
+            className="input flex-1 text-sm"
+            required
+          />
+        </div>
+      )}
+
+      <input
+        type="text"
+        value={location}
+        onChange={(e) => setLocation(e.target.value)}
+        placeholder="Location (optional)"
+        className="input w-full text-sm"
+      />
+
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="btn btn-secondary text-sm py-2"
+          disabled={isLoading}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="btn btn-primary text-sm py-2"
+          disabled={isLoading || !title.trim()}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            'Create Event'
+          )}
+        </button>
+      </div>
+    </motion.form>
+  );
+}
+
 function FreeBlock({ start, end }: { start: Date; end: Date }) {
   const duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
 
@@ -144,7 +299,10 @@ export function CalendarWidget() {
     events: googleEvents,
     signIn,
     refreshEvents,
+    createEvent,
   } = useGoogleCalendar();
+
+  const [showNewEventForm, setShowNewEventForm] = useState(false);
 
   // Use Google events if authenticated, otherwise use store events (sample data)
   const events = isAuthenticated ? googleEvents : getTodayEvents();
@@ -219,23 +377,50 @@ export function CalendarWidget() {
         </div>
         <div className="flex items-center gap-1">
           {isAuthenticated && (
-            <button
-              onClick={refreshEvents}
-              disabled={isLoading}
-              className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
-              title="Refresh events"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <>
+              <button
+                onClick={() => setShowNewEventForm(true)}
+                disabled={isLoading || showNewEventForm}
+                className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-terracotta disabled:opacity-50"
+                title="Add event"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={refreshEvents}
+                disabled={isLoading}
+                className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
+                title="Refresh events"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </>
           )}
           <button
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
             title="Open in Google Calendar"
+            onClick={() => window.open('https://calendar.google.com', '_blank')}
           >
             <ExternalLink className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* New Event Form */}
+      <AnimatePresence>
+        {showNewEventForm && (
+          <div className="mb-4">
+            <NewEventForm
+              onSubmit={async (params) => {
+                await createEvent(params);
+                setShowNewEventForm(false);
+              }}
+              onCancel={() => setShowNewEventForm(false)}
+              isLoading={isLoading}
+            />
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Not connected state */}
       {!isAuthenticated && events.length === 0 ? (

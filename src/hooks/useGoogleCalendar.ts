@@ -3,6 +3,16 @@ import { googleCalendarService } from '../services/googleCalendar';
 import { useDashboardStore } from '../store';
 import type { CalendarEvent, CalendarInfo } from '../types';
 
+interface CreateEventParams {
+  calendarId?: string;
+  title: string;
+  description?: string;
+  start: Date;
+  end: Date;
+  allDay?: boolean;
+  location?: string;
+}
+
 interface UseGoogleCalendarReturn {
   // State
   isConfigured: boolean;
@@ -19,6 +29,7 @@ interface UseGoogleCalendarReturn {
   signOut: () => void;
   refreshEvents: () => Promise<void>;
   toggleCalendarSelection: (calendarId: string) => void;
+  createEvent: (params: CreateEventParams) => Promise<CalendarEvent | null>;
 }
 
 export function useGoogleCalendar(): UseGoogleCalendarReturn {
@@ -191,6 +202,35 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     [setCalendarEvents]
   );
 
+  // Create a new event
+  const createEvent = useCallback(
+    async (params: CreateEventParams): Promise<CalendarEvent | null> => {
+      if (!isAuthenticated) {
+        setError('Not authenticated');
+        return null;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const newEvent = await googleCalendarService.createEvent(params);
+
+        // Refresh events to include the new one
+        await refreshEvents();
+
+        return newEvent;
+      } catch (err) {
+        console.error('Failed to create event:', err);
+        setError(err instanceof Error ? err.message : 'Failed to create event');
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isAuthenticated, refreshEvents]
+  );
+
   return {
     isConfigured,
     isInitialized,
@@ -204,5 +244,6 @@ export function useGoogleCalendar(): UseGoogleCalendarReturn {
     signOut,
     refreshEvents,
     toggleCalendarSelection,
+    createEvent,
   };
 }

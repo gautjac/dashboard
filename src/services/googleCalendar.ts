@@ -18,7 +18,7 @@ import { startOfDay, endOfDay, addDays } from 'date-fns';
 import type { CalendarEvent, CalendarInfo } from '../types';
 
 // Google API configuration
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/calendar';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
 // Types for Google API responses
@@ -454,6 +454,188 @@ class GoogleCalendarService {
     }
 
     return this.getEvents(calendarIds, today, endDate);
+  }
+
+  /**
+   * Create a new calendar event
+   */
+  async createEvent(params: {
+    calendarId?: string;
+    title: string;
+    description?: string;
+    start: Date;
+    end: Date;
+    allDay?: boolean;
+    location?: string;
+  }): Promise<CalendarEvent> {
+    if (!this.isAuthenticated()) {
+      throw new Error('Not authenticated');
+    }
+
+    const calendarId = params.calendarId || 'primary';
+
+    // Format start/end based on all-day or timed event
+    const eventBody: Record<string, unknown> = {
+      summary: params.title,
+      description: params.description,
+      location: params.location,
+    };
+
+    if (params.allDay) {
+      // All-day events use date format (YYYY-MM-DD)
+      eventBody.start = {
+        date: params.start.toISOString().split('T')[0],
+      };
+      eventBody.end = {
+        date: params.end.toISOString().split('T')[0],
+      };
+    } else {
+      // Timed events use dateTime format
+      eventBody.start = {
+        dateTime: params.start.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+      eventBody.end = {
+        dateTime: params.end.toISOString(),
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      };
+    }
+
+    try {
+      const response = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+          calendarId
+        )}/events`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(eventBody),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || `Failed to create event: ${response.status}`);
+      }
+
+      const event: GoogleCalendarEvent = await response.json();
+      const calendarList = await this.getCalendarList();
+      const calendarInfo = calendarList.find((c) => c.id === calendarId);
+
+      return {
+        id: event.id,
+        title: event.summary || params.title,
+        description: event.description,
+        start: event.start?.dateTime || `${event.start?.date}T00:00:00`,
+        end: event.end?.dateTime || `${event.end?.date}T23:59:59`,
+        allDay: Boolean(event.start?.date),
+        location: event.location,
+        calendarId,
+        calendarName: calendarInfo?.name || 'Calendar',
+        color: calendarInfo?.color || '#4285F4',
+      };
+    } catch (error) {
+      console.error('Failed to create calendar event:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a calendar event
+   */
+  async deleteEvent(calendarId: string, eventId: string): Promise<void> {
+    if (!this.isAuthenticated()) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        calendarId
+      )}/events/${encodeURIComponent(eventId)}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok && response.status !== 204) {
+      throw new Error(`Failed to delete event: ${response.status}`);
+    }
+  }
+
+  /**
+   * Update an existing calendar event
+   */
+  async updateEvent(params: {
+    calendarId: string;
+    eventId: string;
+    title?: string;
+    description?: string;
+    start?: Date;
+    end?: Date;
+    allDay?: boolean;
+    location?: string;
+  }): Promise<CalendarEvent> {
+    if (!this.isAuthenticated()) {
+      throw new Error('Not authenticated');
+    }
+
+    const eventBody: Record<string, unknown> = {};
+
+    if (params.title !== undefined) eventBody.summary = params.title;
+    if (params.description !== undefined) eventBody.description = params.description;
+    if (params.location !== undefined) eventBody.location = params.location;
+
+    if (params.start && params.end) {
+      if (params.allDay) {
+        eventBody.start = { date: params.start.toISOString().split('T')[0] };
+        eventBody.end = { date: params.end.toISOString().split('T')[0] };
+      } else {
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        eventBody.start = { dateTime: params.start.toISOString(), timeZone };
+        eventBody.end = { dateTime: params.end.toISOString(), timeZone };
+      }
+    }
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+        params.calendarId
+      )}/events/${encodeURIComponent(params.eventId)}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventBody),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to update event: ${response.status}`);
+    }
+
+    const event: GoogleCalendarEvent = await response.json();
+    const calendarList = await this.getCalendarList();
+    const calendarInfo = calendarList.find((c) => c.id === params.calendarId);
+
+    return {
+      id: event.id,
+      title: event.summary || '',
+      description: event.description,
+      start: event.start?.dateTime || `${event.start?.date}T00:00:00`,
+      end: event.end?.dateTime || `${event.end?.date}T23:59:59`,
+      allDay: Boolean(event.start?.date),
+      location: event.location,
+      calendarId: params.calendarId,
+      calendarName: calendarInfo?.name || 'Calendar',
+      color: calendarInfo?.color || '#4285F4',
+    };
   }
 }
 
