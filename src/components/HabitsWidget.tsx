@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { HabitHistoryModal } from './HabitHistoryModal';
+import { AddHabitModal } from './AddHabitModal';
 import type { HabitWithStats } from '../types';
 
 // Icon mapping
@@ -263,6 +264,7 @@ export function HabitsWidget() {
   } = useDashboardStore();
 
   const [showHistory, setShowHistory] = useState(false);
+  const [showAddHabit, setShowAddHabit] = useState(false);
 
   const habitsWithStats = getHabitsWithStats();
   const completedCount = habitsWithStats.filter((h) => h.todayCompleted).length;
@@ -292,7 +294,11 @@ export function HabitsWidget() {
           >
             <CalendarDays className="w-4 h-4" />
           </button>
-          <button className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink">
+          <button
+            onClick={() => setShowAddHabit(true)}
+            className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
+            title="Add habit"
+          >
             <Plus className="w-4 h-4" />
           </button>
         </div>
@@ -327,7 +333,10 @@ export function HabitsWidget() {
           <p className="font-ui text-sm text-ink-muted mb-4">
             Start building positive routines
           </p>
-          <button className="btn btn-secondary text-sm">
+          <button
+            onClick={() => setShowAddHabit(true)}
+            className="btn btn-secondary text-sm"
+          >
             <Plus className="w-4 h-4" />
             Add your first habit
           </button>
@@ -366,6 +375,11 @@ export function HabitsWidget() {
       {/* History Modal */}
       <AnimatePresence>
         {showHistory && <HabitHistoryModal onClose={() => setShowHistory(false)} />}
+      </AnimatePresence>
+
+      {/* Add Habit Modal */}
+      <AnimatePresence>
+        {showAddHabit && <AddHabitModal onClose={() => setShowAddHabit(false)} />}
       </AnimatePresence>
     </motion.div>
   );
