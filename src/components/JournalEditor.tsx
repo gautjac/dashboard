@@ -92,7 +92,7 @@ export function JournalEditor() {
     }
   }, [content]);
 
-  const handleSave = () => {
+  const handleSave = (closeAfter = false) => {
     if (!content.trim()) return;
 
     setIsSaving(true);
@@ -115,7 +115,10 @@ export function JournalEditor() {
     setLastSaved(new Date());
     setTimeout(() => {
       setIsSaving(false);
-    }, 500);
+      if (closeAfter) {
+        setJournalEditorOpen(false);
+      }
+    }, 300);
   };
 
   const handleClose = () => {
@@ -421,7 +424,7 @@ export function JournalEditor() {
               Cancel
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => handleSave(true)}
               disabled={!content.trim() || isSaving}
               className="btn btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
