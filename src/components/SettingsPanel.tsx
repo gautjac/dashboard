@@ -88,10 +88,43 @@ export function SettingsPanel() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="relative w-full max-w-3xl max-h-[85vh] bg-cream rounded-2xl shadow-lifted overflow-hidden flex"
+        className="relative w-full max-w-3xl max-h-[85vh] bg-cream rounded-2xl shadow-lifted overflow-hidden flex flex-col sm:flex-row"
       >
-        {/* Sidebar */}
-        <div className="w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-4">
+        {/* Mobile header with tabs */}
+        <div className="sm:hidden bg-parchment-dark/50 border-b border-warm-gray/50 p-3">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-display text-lg font-semibold text-ink">
+              Settings
+            </h2>
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-warm-gray transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav className="flex gap-1 overflow-x-auto pb-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  flex items-center gap-1.5 px-3 py-2 rounded-lg font-ui text-xs whitespace-nowrap transition-colors
+                  ${activeTab === tab.id
+                    ? 'bg-ink text-parchment'
+                    : 'text-ink-light hover:bg-warm-gray'
+                  }
+                `}
+              >
+                {tab.icon}
+                <span className="hidden xs:inline">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Desktop Sidebar - hidden on mobile */}
+        <div className="hidden sm:block w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-4">
           <h2 className="font-display text-xl font-semibold text-ink mb-4 px-2">
             Settings
           </h2>
@@ -116,9 +149,9 @@ export function SettingsPanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-warm-gray/50">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Header - hidden on mobile since we have the mobile header above */}
+          <div className="hidden sm:flex items-center justify-between px-6 py-4 border-b border-warm-gray/50">
             <h3 className="font-display text-lg font-semibold text-ink">
               {tabs.find((t) => t.id === activeTab)?.label}
             </h3>
@@ -131,7 +164,7 @@ export function SettingsPanel() {
           </div>
 
           {/* Content area */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {activeTab === 'general' && (
               <div className="space-y-6">
                 {/* Theme */}
@@ -361,7 +394,7 @@ export function SettingsPanel() {
 
                 <div className="p-3 rounded-lg bg-warm-gray/30">
                   <p className="font-ui text-xs text-ink-muted">
-                    We use read-only access to display your schedule. We never modify your calendar.
+                    Calendar access allows you to view and create events from your dashboard.
                     Your calendar data is only stored locally on your device.
                   </p>
                 </div>
