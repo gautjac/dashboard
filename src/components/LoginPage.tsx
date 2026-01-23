@@ -23,12 +23,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-parchment paper-texture flex items-center justify-center p-4">
+    <div className="min-h-screen w-full bg-parchment paper-texture flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md mx-auto"
+        style={{ minWidth: '320px' }}
       >
         {/* Logo and Title */}
         <div className="text-center mb-8">
@@ -44,12 +45,12 @@ export function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="card p-8">
+        <div className="card p-8" style={{ width: '100%' }}>
           <div className="text-center mb-6">
-            <h2 className="font-display text-xl font-semibold text-ink">
+            <h2 className="font-display text-xl font-semibold text-ink whitespace-nowrap">
               Welcome
             </h2>
-            <p className="font-ui text-sm text-ink-muted mt-1">
+            <p className="font-ui text-sm text-ink-muted mt-1 whitespace-normal">
               Sign in to access your dashboard
             </p>
           </div>
@@ -57,18 +58,18 @@ export function LoginPage() {
           <div className="space-y-3">
             <button
               onClick={login}
-              className="btn btn-primary w-full justify-center py-3"
+              className="btn btn-primary w-full justify-center py-3 whitespace-nowrap"
             >
-              <LogIn className="w-5 h-5" />
-              Sign In
+              <LogIn className="w-5 h-5 flex-shrink-0" />
+              <span>Sign In</span>
             </button>
 
             <button
               onClick={signup}
-              className="btn btn-secondary w-full justify-center py-3"
+              className="btn btn-secondary w-full justify-center py-3 whitespace-nowrap"
             >
-              <UserPlus className="w-5 h-5" />
-              Create Account
+              <UserPlus className="w-5 h-5 flex-shrink-0" />
+              <span>Create Account</span>
             </button>
           </div>
 
