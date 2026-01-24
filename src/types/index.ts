@@ -99,6 +99,8 @@ export interface InterestArea {
 export interface DailyBrief {
   date: string;
   items: DailyBriefItem[];
+  itemsByTopic?: Record<string, DailyBriefItem[]>;
+  topics?: string[];
   followUpQuestions: string[];
   generatedAt: string;
 }
@@ -130,6 +132,7 @@ export interface UserSettings {
   computerAccessEnabled: boolean;
   aiAnalysisEnabled: boolean;
   dataExportFormat: 'json' | 'csv';
+  perplexityApiKey?: string; // For real news in Daily Brief
 }
 
 export interface WeeklyInsight {
@@ -169,6 +172,15 @@ export interface Bookmark {
   url: string;
   savedAt: string;
   source?: 'readwise' | 'extension';
+}
+
+export interface Todo {
+  id: string;
+  title: string;
+  dueDate: string | null; // YYYY-MM-DD
+  completed: boolean;
+  completedAt: string | null;
+  createdAt: string;
 }
 
 export interface ApiKey {
@@ -213,6 +225,7 @@ export interface DashboardState {
   habitCompletions: HabitCompletion[];
   journalEntries: JournalEntry[];
   focusLines: FocusLine[];
+  todos: Todo[];
 
   // Calendar
   calendarAccounts: CalendarAccount[];

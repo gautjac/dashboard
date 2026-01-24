@@ -134,6 +134,18 @@ export async function initializeSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS todos (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      due_date DATE,
+      completed BOOLEAN DEFAULT false,
+      completed_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_completions_habit ON habit_completions(habit_id)`;
@@ -144,6 +156,8 @@ export async function initializeSchema() {
   await sql`CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON extension_bookmarks(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_bookmarks_user_date ON extension_bookmarks(user_id, bookmarked_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_todos_user ON todos(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_todos_user_due ON todos(user_id, due_date)`;
 
   return { success: true };
 }

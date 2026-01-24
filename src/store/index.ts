@@ -7,6 +7,7 @@ import type {
   HabitWithStats,
   JournalEntry,
   FocusLine,
+  Todo,
   CalendarEvent,
   CalendarAccount,
   InterestArea,
@@ -23,6 +24,7 @@ interface DashboardStore {
   habitCompletions: HabitCompletion[];
   journalEntries: JournalEntry[];
   focusLines: FocusLine[];
+  todos: Todo[];
   calendarAccounts: CalendarAccount[];
   calendarEvents: CalendarEvent[];
   interestAreas: InterestArea[];
@@ -57,6 +59,13 @@ interface DashboardStore {
   setFocusLine: (text: string, date?: string) => void;
   getTodayFocusLine: () => FocusLine | null;
 
+  // Todo Actions
+  addTodo: (todo: Omit<Todo, 'id' | 'completed' | 'completedAt' | 'createdAt'>) => void;
+  updateTodo: (id: string, updates: Partial<Todo>) => void;
+  toggleTodo: (id: string) => void;
+  deleteTodo: (id: string) => void;
+  setTodos: (todos: Todo[]) => void;
+
   // Calendar Actions
   addCalendarAccount: (account: Omit<CalendarAccount, 'id'>) => void;
   removeCalendarAccount: (id: string) => void;
@@ -69,6 +78,7 @@ interface DashboardStore {
   deleteInterestArea: (id: string) => void;
   setDailyBrief: (brief: DailyBrief) => void;
   getTodayBrief: () => DailyBrief | null;
+  updateBriefItemInsight: (itemId: string, whyItMatters: string) => void;
 
   // Settings Actions
   updateSettings: (updates: Partial<UserSettings>) => void;
@@ -172,6 +182,7 @@ export const useDashboardStore = create<DashboardStore>()(
       habitCompletions: [],
       journalEntries: [],
       focusLines: [],
+      todos: [],
       calendarAccounts: [],
       calendarEvents: [],
       interestAreas: [],
@@ -367,6 +378,53 @@ export const useDashboardStore = create<DashboardStore>()(
         return get().focusLines.find(f => f.date === today()) ?? null;
       },
 
+      // Todo Actions
+      addTodo: (todo) => {
+        const newTodo: Todo = {
+          id: generateId(),
+          title: todo.title,
+          dueDate: todo.dueDate,
+          completed: false,
+          completedAt: null,
+          createdAt: new Date().toISOString(),
+        };
+        set(state => ({
+          todos: [...state.todos, newTodo],
+        }));
+      },
+
+      updateTodo: (id, updates) => {
+        set(state => ({
+          todos: state.todos.map(t =>
+            t.id === id ? { ...t, ...updates } : t
+          ),
+        }));
+      },
+
+      toggleTodo: (id) => {
+        set(state => ({
+          todos: state.todos.map(t =>
+            t.id === id
+              ? {
+                  ...t,
+                  completed: !t.completed,
+                  completedAt: !t.completed ? new Date().toISOString() : null,
+                }
+              : t
+          ),
+        }));
+      },
+
+      deleteTodo: (id) => {
+        set(state => ({
+          todos: state.todos.filter(t => t.id !== id),
+        }));
+      },
+
+      setTodos: (todos) => {
+        set({ todos });
+      },
+
       // Calendar Actions
       addCalendarAccount: (account) => {
         const newAccount: CalendarAccount = {
@@ -437,6 +495,39 @@ export const useDashboardStore = create<DashboardStore>()(
 
       getTodayBrief: () => {
         return get().dailyBriefs.find(b => b.date === today()) ?? null;
+      },
+
+      updateBriefItemInsight: (itemId, whyItMatters) => {
+        set(state => {
+          const todayDate = today();
+          const briefIndex = state.dailyBriefs.findIndex(b => b.date === todayDate);
+          if (briefIndex < 0) return state;
+
+          const brief = state.dailyBriefs[briefIndex];
+          const updatedItems = brief.items.map(item =>
+            item.id === itemId ? { ...item, whyItMatters } : item
+          );
+
+          // Also update itemsByTopic if it exists
+          let updatedItemsByTopic = brief.itemsByTopic;
+          if (updatedItemsByTopic) {
+            updatedItemsByTopic = { ...updatedItemsByTopic };
+            for (const topic of Object.keys(updatedItemsByTopic)) {
+              updatedItemsByTopic[topic] = updatedItemsByTopic[topic].map(item =>
+                item.id === itemId ? { ...item, whyItMatters } : item
+              );
+            }
+          }
+
+          const newBriefs = [...state.dailyBriefs];
+          newBriefs[briefIndex] = {
+            ...brief,
+            items: updatedItems,
+            itemsByTopic: updatedItemsByTopic
+          };
+
+          return { dailyBriefs: newBriefs };
+        });
       },
 
       // Settings Actions
@@ -556,6 +647,7 @@ export const useDashboardStore = create<DashboardStore>()(
           habitCompletions: [],
           journalEntries: [],
           focusLines: [],
+          todos: [],
           calendarAccounts: [],
           calendarEvents: [],
           interestAreas: [],

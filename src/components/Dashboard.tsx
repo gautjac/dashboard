@@ -12,6 +12,7 @@ import { HabitsWidget } from './HabitsWidget';
 import { JournalWidget } from './JournalWidget';
 import { DailyBriefWidget } from './DailyBriefWidget';
 import { BookmarksWidget } from './BookmarksWidget';
+import { TodosWidget } from './TodosWidget';
 import { SettingsPanel } from './SettingsPanel';
 import { JournalEditor } from './JournalEditor';
 import { WeeklyReflectionPanel } from './WeeklyReflectionPanel';
@@ -177,6 +178,7 @@ export function Dashboard() {
             {/* Left Column - Primary Content */}
             <div className="lg:col-span-7 space-y-6 stagger-children">
               <HabitsWidget />
+              <TodosWidget />
               <JournalWidget />
             </div>
 
