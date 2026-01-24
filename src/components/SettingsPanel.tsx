@@ -19,7 +19,6 @@ import {
   CloudOff,
   ChevronDown,
   Bookmark,
-  Twitter,
   Puzzle,
   Key,
   Copy,
@@ -27,7 +26,6 @@ import {
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
-import { useReadwiseBookmarks } from '../hooks/useReadwiseBookmarks';
 import type { JournalPromptStyleType, ApiKey } from '../types';
 
 type SettingsTab = 'general' | 'calendar' | 'bookmarks' | 'ai' | 'interests' | 'sync' | 'privacy';
@@ -53,7 +51,6 @@ export function SettingsPanel() {
     journalEntries,
     focusLines,
     weeklyReflections,
-    bookmarks,
     updateHabit,
     syncEnabled,
     syncStatus,
@@ -65,7 +62,6 @@ export function SettingsPanel() {
   } = useDashboardStore();
 
   const [syncUserId, setSyncUserId] = useState('');
-  const [readwiseTokenInput, setReadwiseTokenInput] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearConfirmText, setClearConfirmText] = useState('');
 
@@ -89,16 +85,6 @@ export function SettingsPanel() {
     toggleCalendarSelection,
   } = useGoogleCalendar();
 
-  const {
-    isConfigured: isReadwiseConfigured,
-    isLoading: isReadwiseLoading,
-    error: readwiseError,
-    bookmarks: readwiseBookmarks,
-    setToken: setReadwiseToken,
-    clearToken: clearReadwiseToken,
-    clearError: clearReadwiseError,
-    refreshBookmarks,
-  } = useReadwiseBookmarks();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [expandedPromptStyle, setExpandedPromptStyle] = useState<JournalPromptStyleType | null>(null);
@@ -219,21 +205,6 @@ export function SettingsPanel() {
           markdown += `- Avg energy: ${reflection.stats.avgEnergy.toFixed(1)}/5\n`;
         }
         markdown += `\n---\n\n`;
-      }
-    }
-
-    // Bookmarks
-    markdown += `## X Bookmarks\n\n`;
-    if (bookmarks.length === 0) {
-      markdown += `_No bookmarks_\n\n`;
-    } else {
-      for (const bookmark of bookmarks) {
-        markdown += `### @${bookmark.author}\n\n`;
-        markdown += `${bookmark.text}\n\n`;
-        const savedDate = new Date(bookmark.savedAt);
-        const savedDateStr = isNaN(savedDate.getTime()) ? 'Unknown' : savedDate.toLocaleDateString();
-        markdown += `[View on X](${bookmark.url}) | Saved: ${savedDateStr}\n\n`;
-        markdown += `---\n\n`;
       }
     }
 
@@ -776,169 +747,10 @@ export function SettingsPanel() {
 
             {activeTab === 'bookmarks' && (
               <div className="space-y-6">
-                {/* Error message */}
-                {readwiseError && (
-                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-ui text-sm text-red-700">{readwiseError}</p>
-                      <button
-                        onClick={clearReadwiseError}
-                        className="font-ui text-xs text-red-500 hover:text-red-700 mt-1"
-                      >
-                        Dismiss
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Readwise connection */}
+                {/* Browser Extension Section */}
                 <div>
                   <label className="font-ui text-sm font-medium text-ink block mb-3">
-                    X Bookmarks via Readwise
-                  </label>
-
-                  {!isReadwiseConfigured ? (
-                    <div className="space-y-4">
-                      <div className="p-4 rounded-lg border border-dashed border-warm-gray-dark">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
-                            <Twitter className="w-5 h-5 text-[#1DA1F2]" />
-                          </div>
-                          <div>
-                            <p className="font-ui text-sm font-medium text-ink">
-                              Connect Readwise Reader
-                            </p>
-                            <p className="font-ui text-xs text-ink-muted">
-                              Sync your X bookmarks to your dashboard
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div>
-                            <label className="font-ui text-xs text-ink-muted block mb-1.5">
-                              Readwise Access Token
-                            </label>
-                            <input
-                              type="password"
-                              value={readwiseTokenInput}
-                              onChange={(e) => setReadwiseTokenInput(e.target.value)}
-                              placeholder="Enter your access token"
-                              className="input w-full text-sm"
-                            />
-                          </div>
-                          <button
-                            onClick={async () => {
-                              if (readwiseTokenInput.trim()) {
-                                const success = await setReadwiseToken(readwiseTokenInput.trim());
-                                if (success) {
-                                  setReadwiseTokenInput('');
-                                }
-                              }
-                            }}
-                            disabled={!readwiseTokenInput.trim() || isReadwiseLoading}
-                            className="btn btn-primary text-sm w-full disabled:opacity-50"
-                          >
-                            {isReadwiseLoading ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Connecting...
-                              </>
-                            ) : (
-                              <>
-                                <Check className="w-4 h-4" />
-                                Connect Readwise
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-warm-gray/30">
-                        <p className="font-ui text-xs text-ink-muted mb-2">
-                          <strong>Setup instructions:</strong>
-                        </p>
-                        <ol className="font-ui text-xs text-ink-muted list-decimal list-inside space-y-1">
-                          <li>
-                            Get your access token at{' '}
-                            <a
-                              href="https://readwise.io/access_token"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-terracotta hover:text-terracotta-dark inline-flex items-center gap-0.5"
-                            >
-                              readwise.io/access_token
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </li>
-                          <li>
-                            Ensure X/Twitter is connected in{' '}
-                            <a
-                              href="https://readwise.io/reader_integrations"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-terracotta hover:text-terracotta-dark inline-flex items-center gap-0.5"
-                            >
-                              Readwise Reader settings
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </li>
-                          <li>Paste your token above and connect</li>
-                        </ol>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Connected state */}
-                      <div className="flex items-center justify-between p-3 rounded-lg bg-sage-light/30 border border-sage/20">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
-                            <Twitter className="w-5 h-5 text-[#1DA1F2]" />
-                          </div>
-                          <div>
-                            <p className="font-ui text-sm font-medium text-ink">
-                              Readwise Reader
-                            </p>
-                            <p className="font-ui text-xs text-sage-dark">
-                              <Check className="w-3 h-3 inline mr-1" />
-                              Connected ({readwiseBookmarks.length} bookmarks)
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={refreshBookmarks}
-                            disabled={isReadwiseLoading}
-                            className="btn-ghost p-2 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
-                            title="Refresh bookmarks"
-                          >
-                            <RefreshCw className={`w-4 h-4 ${isReadwiseLoading ? 'animate-spin' : ''}`} />
-                          </button>
-                          <button
-                            onClick={clearReadwiseToken}
-                            className="btn-ghost p-2 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
-                            title="Disconnect"
-                          >
-                            <LogOut className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-warm-gray/30">
-                        <p className="font-ui text-xs text-ink-muted">
-                          Bookmarks are synced from Readwise Reader. When you bookmark a tweet on X,
-                          it will appear here within a few minutes after Readwise syncs.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Browser Extension Section */}
-                <div className="pt-6 border-t border-warm-gray/50">
-                  <label className="font-ui text-sm font-medium text-ink block mb-3">
-                    Browser Extension (Real-time sync)
+                    X Bookmarks - Browser Extension
                   </label>
 
                   <div className="space-y-4">

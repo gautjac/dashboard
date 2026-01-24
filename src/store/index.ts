@@ -14,7 +14,6 @@ import type {
   UserSettings,
   WeeklyInsight,
   WeeklyReflection,
-  Bookmark,
 } from '../types';
 import { syncService } from '../services/syncService';
 
@@ -30,8 +29,6 @@ interface DashboardStore {
   dailyBriefs: DailyBrief[];
   weeklyInsights: WeeklyInsight[];
   weeklyReflections: WeeklyReflection[];
-  readwiseToken: string | null;
-  bookmarks: Bookmark[];
   settings: UserSettings;
 
   // UI State
@@ -80,11 +77,6 @@ interface DashboardStore {
   addWeeklyReflection: (reflection: Omit<WeeklyReflection, 'id'>) => void;
   getWeeklyReflection: (weekStart: string) => WeeklyReflection | null;
   getAllWeeklyReflections: () => WeeklyReflection[];
-
-  // Bookmark Actions
-  setReadwiseToken: (token: string | null) => void;
-  setBookmarks: (bookmarks: Bookmark[]) => void;
-  clearBookmarks: () => void;
 
   // UI Actions
   setCurrentView: (view: DashboardStore['currentView']) => void;
@@ -186,8 +178,6 @@ export const useDashboardStore = create<DashboardStore>()(
       dailyBriefs: [],
       weeklyInsights: [],
       weeklyReflections: [],
-      readwiseToken: null,
-      bookmarks: [],
       settings: {
         theme: 'light',
         showWeather: false,
@@ -485,11 +475,6 @@ export const useDashboardStore = create<DashboardStore>()(
         );
       },
 
-      // Bookmark Actions
-      setReadwiseToken: (token) => set({ readwiseToken: token }),
-      setBookmarks: (bookmarks) => set({ bookmarks }),
-      clearBookmarks: () => set({ bookmarks: [], readwiseToken: null }),
-
       // UI Actions
       setCurrentView: (view) => set({ currentView: view }),
       setSelectedDate: (date) => set({ selectedDate: date }),
@@ -577,8 +562,6 @@ export const useDashboardStore = create<DashboardStore>()(
           dailyBriefs: [],
           weeklyInsights: [],
           weeklyReflections: [],
-          readwiseToken: null,
-          bookmarks: [],
           settings: {
             theme: 'light',
             showWeather: false,
@@ -595,7 +578,6 @@ export const useDashboardStore = create<DashboardStore>()(
         localStorage.removeItem('gcal_access_token');
         localStorage.removeItem('gcal_token_expiry');
         localStorage.removeItem('gcal_user_email');
-        localStorage.removeItem('readwise_access_token');
       },
     }),
     {
@@ -610,8 +592,6 @@ export const useDashboardStore = create<DashboardStore>()(
         dailyBriefs: state.dailyBriefs,
         weeklyInsights: state.weeklyInsights,
         weeklyReflections: state.weeklyReflections,
-        readwiseToken: state.readwiseToken,
-        bookmarks: state.bookmarks,
         settings: state.settings,
         syncEnabled: state.syncEnabled,
       }),

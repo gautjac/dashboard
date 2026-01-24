@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
   Bookmark as BookmarkIcon,
   ExternalLink,
@@ -11,7 +11,6 @@ import {
   Puzzle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useReadwiseBookmarks } from '../hooks/useReadwiseBookmarks';
 import { useExtensionBookmarks } from '../hooks/useExtensionBookmarks';
 import { useDashboardStore } from '../store';
 import { formatDistanceToNow } from 'date-fns';
@@ -59,12 +58,6 @@ function BookmarkItem({ bookmark, index }: BookmarkItemProps) {
                 }
               })()}
             </span>
-            {bookmark.source === 'extension' && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-terracotta/10 text-terracotta text-[10px] font-medium">
-                <Puzzle className="w-2.5 h-2.5" />
-                ext
-              </span>
-            )}
           </div>
 
           {/* Tweet text */}
@@ -109,67 +102,17 @@ function BookmarkItem({ bookmark, index }: BookmarkItemProps) {
 export function BookmarksWidget() {
   const { setSettingsOpen } = useDashboardStore();
   const {
-    isConfigured: isReadwiseConfigured,
-    isLoading: isReadwiseLoading,
-    error: readwiseError,
-    bookmarks: readwiseBookmarks,
-    refreshBookmarks: refreshReadwiseBookmarks,
-    clearError: clearReadwiseError,
-  } = useReadwiseBookmarks();
-
-  const {
-    bookmarks: extensionBookmarks,
-    isLoading: isExtensionLoading,
-    error: extensionError,
-    refreshBookmarks: refreshExtensionBookmarks,
+    bookmarks,
+    isLoading,
+    error,
+    refreshBookmarks,
+    total,
   } = useExtensionBookmarks();
 
   const [showAll, setShowAll] = useState(false);
 
-  // Merge and dedupe bookmarks from both sources
-  const allBookmarks = useMemo(() => {
-    const combined: Bookmark[] = [];
-    const seenUrls = new Set<string>();
-
-    // Add extension bookmarks first (they're more recent)
-    for (const bookmark of extensionBookmarks) {
-      const normalizedUrl = bookmark.url.replace(/^https?:\/\/(www\.)?(twitter|x)\.com/, '');
-      if (!seenUrls.has(normalizedUrl)) {
-        seenUrls.add(normalizedUrl);
-        combined.push({ ...bookmark, source: 'extension' });
-      }
-    }
-
-    // Add Readwise bookmarks, skipping duplicates
-    for (const bookmark of readwiseBookmarks) {
-      const normalizedUrl = bookmark.url.replace(/^https?:\/\/(www\.)?(twitter|x)\.com/, '');
-      if (!seenUrls.has(normalizedUrl)) {
-        seenUrls.add(normalizedUrl);
-        combined.push({ ...bookmark, source: 'readwise' });
-      }
-    }
-
-    // Sort by savedAt descending
-    return combined.sort((a, b) => {
-      const dateA = new Date(a.savedAt).getTime();
-      const dateB = new Date(b.savedAt).getTime();
-      if (isNaN(dateA) && isNaN(dateB)) return 0;
-      if (isNaN(dateA)) return 1;
-      if (isNaN(dateB)) return -1;
-      return dateB - dateA;
-    });
-  }, [readwiseBookmarks, extensionBookmarks]);
-
-  const isLoading = isReadwiseLoading || isExtensionLoading;
-  const error = readwiseError || extensionError;
-  const isConfigured = isReadwiseConfigured || extensionBookmarks.length > 0;
-
-  const handleRefresh = () => {
-    refreshReadwiseBookmarks();
-    refreshExtensionBookmarks();
-  };
-
-  const displayedBookmarks = showAll ? allBookmarks : allBookmarks.slice(0, 5);
+  const displayedBookmarks = showAll ? bookmarks : bookmarks.slice(0, 5);
+  const hasBookmarks = bookmarks.length > 0 || total > 0;
 
   return (
     <motion.div
@@ -187,11 +130,11 @@ export function BookmarksWidget() {
           </h3>
         </div>
         <div className="flex items-center gap-1">
-          {isConfigured && (
+          {hasBookmarks && (
             <button
               className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
               title="Refresh bookmarks"
-              onClick={handleRefresh}
+              onClick={refreshBookmarks}
               disabled={isLoading}
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -199,7 +142,7 @@ export function BookmarksWidget() {
           )}
           <button
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
-            title="Configure Readwise"
+            title="Configure extension"
             onClick={() => setSettingsOpen(true)}
           >
             <Settings2 className="w-4 h-4" />
@@ -213,37 +156,11 @@ export function BookmarksWidget() {
           <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
             <p className="font-ui text-sm text-red-700">{error}</p>
-            <button
-              onClick={clearReadwiseError}
-              className="font-ui text-xs text-red-500 hover:text-red-700 mt-1"
-            >
-              Dismiss
-            </button>
           </div>
         </div>
       )}
 
-      {!isConfigured ? (
-        // Not configured state
-        <div className="py-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
-            <Twitter className="w-6 h-6 text-[#1DA1F2]" />
-          </div>
-          <p className="font-display text-lg text-ink">
-            See your X bookmarks
-          </p>
-          <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-            Connect Readwise to sync your saved tweets
-          </p>
-          <button
-            className="btn btn-secondary text-sm"
-            onClick={() => setSettingsOpen(true)}
-          >
-            <Settings2 className="w-4 h-4" />
-            Configure Readwise
-          </button>
-        </div>
-      ) : isLoading && allBookmarks.length === 0 ? (
+      {isLoading && bookmarks.length === 0 ? (
         // Loading state
         <div className="py-8 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center animate-pulse">
@@ -253,18 +170,25 @@ export function BookmarksWidget() {
             Loading your bookmarks...
           </p>
         </div>
-      ) : allBookmarks.length === 0 ? (
-        // Empty state
+      ) : bookmarks.length === 0 ? (
+        // Empty state - prompt to set up extension
         <div className="py-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
-            <BookmarkIcon className="w-6 h-6 text-ink-muted" />
+          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-terracotta/10 flex items-center justify-center">
+            <Puzzle className="w-6 h-6 text-terracotta" />
           </div>
           <p className="font-display text-lg text-ink">
-            No bookmarks yet
+            Set up the browser extension
           </p>
-          <p className="font-ui text-sm text-ink-muted mt-1">
-            Bookmark tweets on X to see them here
+          <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
+            Sync your X bookmarks in real-time
           </p>
+          <button
+            className="btn btn-secondary text-sm"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings2 className="w-4 h-4" />
+            Get Started
+          </button>
         </div>
       ) : (
         <>
@@ -278,7 +202,7 @@ export function BookmarksWidget() {
           </div>
 
           {/* Show more / less */}
-          {allBookmarks.length > 5 && (
+          {bookmarks.length > 5 && (
             <button
               onClick={() => setShowAll(!showAll)}
               className="mt-4 w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
@@ -289,7 +213,7 @@ export function BookmarksWidget() {
                 </>
               ) : (
                 <>
-                  Show all {allBookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
+                  Show all {bookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
                 </>
               )}
             </button>

@@ -161,21 +161,7 @@ export interface JournalPrompt {
   contextual?: boolean; // Uses habits/calendar data
 }
 
-// Readwise Bookmarks (X/Twitter)
-export interface ReadwiseDocument {
-  id: string;
-  url: string;
-  source_url: string;
-  title: string;
-  author: string;
-  content?: string;
-  summary?: string;
-  category: string;
-  created_at: string;
-  updated_at: string;
-  published_date?: string;
-}
-
+// X Bookmarks (via browser extension)
 export interface Bookmark {
   id: string;
   text: string;
@@ -240,9 +226,6 @@ export interface DashboardState {
   weeklyInsights: WeeklyInsight[];
   weeklyReflections: WeeklyReflection[];
 
-  // Bookmarks
-  readwiseToken: string | null;
-  bookmarks: Bookmark[];
 
   // Settings
   settings: UserSettings;
