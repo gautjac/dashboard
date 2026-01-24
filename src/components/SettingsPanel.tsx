@@ -17,16 +17,22 @@ import {
   ExternalLink,
   Cloud,
   CloudOff,
+  ChevronDown,
+  Bookmark,
+  Twitter,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useReadwiseBookmarks } from '../hooks/useReadwiseBookmarks';
+import type { JournalPromptStyleType } from '../types';
 
-type SettingsTab = 'general' | 'calendar' | 'ai' | 'interests' | 'sync' | 'privacy';
+type SettingsTab = 'general' | 'calendar' | 'bookmarks' | 'ai' | 'interests' | 'sync' | 'privacy';
 
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Settings className="w-4 h-4" /> },
   { id: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
+  { id: 'bookmarks', label: 'Bookmarks', icon: <Bookmark className="w-4 h-4" /> },
   { id: 'ai', label: 'AI & Analysis', icon: <Brain className="w-4 h-4" /> },
   { id: 'interests', label: 'Interests', icon: <Newspaper className="w-4 h-4" /> },
   { id: 'sync', label: 'Sync', icon: <Cloud className="w-4 h-4" /> },
@@ -40,6 +46,11 @@ export function SettingsPanel() {
     setSettingsOpen,
     interestAreas,
     habits,
+    habitCompletions,
+    journalEntries,
+    focusLines,
+    weeklyReflections,
+    bookmarks,
     updateHabit,
     syncEnabled,
     syncStatus,
@@ -47,9 +58,13 @@ export function SettingsPanel() {
     setSyncEnabled,
     syncToServer,
     loadFromServer,
+    clearAllData,
   } = useDashboardStore();
 
   const [syncUserId, setSyncUserId] = useState('');
+  const [readwiseTokenInput, setReadwiseTokenInput] = useState('');
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearConfirmText, setClearConfirmText] = useState('');
 
   const {
     isConfigured,
@@ -65,7 +80,27 @@ export function SettingsPanel() {
     toggleCalendarSelection,
   } = useGoogleCalendar();
 
+  const {
+    isConfigured: isReadwiseConfigured,
+    isLoading: isReadwiseLoading,
+    error: readwiseError,
+    bookmarks: readwiseBookmarks,
+    setToken: setReadwiseToken,
+    clearToken: clearReadwiseToken,
+    clearError: clearReadwiseError,
+    refreshBookmarks,
+  } = useReadwiseBookmarks();
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [expandedPromptStyle, setExpandedPromptStyle] = useState<JournalPromptStyleType | null>(null);
+
+  const promptStyleLabels: Record<JournalPromptStyleType, { label: string; description: string }> = {
+    mixed: { label: 'Mixed', description: 'Rotating between all styles based on context' },
+    reflective: { label: 'Reflective', description: 'Deep, introspective questions for self-examination' },
+    creative: { label: 'Creative', description: 'Imaginative prompts for creative writing' },
+    tactical: { label: 'Tactical', description: 'Goal-oriented questions about decisions and next steps' },
+    gratitude: { label: 'Gratitude', description: 'Prompts focused on appreciation and positive moments' },
+  };
 
   const handleClose = () => {
     setSettingsOpen(false);
@@ -77,6 +112,149 @@ export function SettingsPanel() {
 
   const handleSignOut = () => {
     signOut();
+  };
+
+  const handleExportMarkdown = () => {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+
+    let markdown = `# Daily Dashboard Export\n\n`;
+    markdown += `**Exported:** ${now.toLocaleString()}\n\n`;
+    markdown += `---\n\n`;
+
+    // Journal Entries
+    markdown += `## Journal Entries\n\n`;
+    if (journalEntries.length === 0) {
+      markdown += `_No journal entries_\n\n`;
+    } else {
+      const sortedEntries = [...journalEntries].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      for (const entry of sortedEntries) {
+        markdown += `### ${entry.date}\n\n`;
+        if (entry.mood || entry.energy) {
+          markdown += `**Mood:** ${entry.mood || '-'}/5 | **Energy:** ${entry.energy || '-'}/5\n\n`;
+        }
+        if (entry.promptUsed) {
+          markdown += `> _Prompt: ${entry.promptUsed}_\n\n`;
+        }
+        markdown += `${entry.content}\n\n`;
+        if (entry.tags.length > 0) {
+          markdown += `**Tags:** ${entry.tags.join(', ')}\n\n`;
+        }
+        markdown += `---\n\n`;
+      }
+    }
+
+    // Focus Lines
+    markdown += `## Focus Lines\n\n`;
+    if (focusLines.length === 0) {
+      markdown += `_No focus lines_\n\n`;
+    } else {
+      const sortedFocusLines = [...focusLines].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+      for (const focus of sortedFocusLines) {
+        markdown += `- **${focus.date}:** ${focus.text}\n`;
+      }
+      markdown += `\n`;
+    }
+
+    // Habits
+    markdown += `## Habits\n\n`;
+    if (habits.length === 0) {
+      markdown += `_No habits_\n\n`;
+    } else {
+      for (const habit of habits) {
+        markdown += `### ${habit.name}\n\n`;
+        if (habit.description) {
+          markdown += `${habit.description}\n\n`;
+        }
+        markdown += `- **Schedule:** ${habit.schedule}\n`;
+        markdown += `- **Type:** ${habit.targetType}\n`;
+        if (habit.targetValue) {
+          markdown += `- **Target:** ${habit.targetValue} ${habit.targetUnit || ''}\n`;
+        }
+
+        // Get completions for this habit
+        const completions = habitCompletions
+          .filter(c => c.habitId === habit.id && c.completed)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 30);
+
+        if (completions.length > 0) {
+          markdown += `- **Recent completions:** ${completions.map(c => c.date).join(', ')}\n`;
+        }
+        markdown += `\n`;
+      }
+    }
+
+    // Weekly Reflections
+    markdown += `## Weekly Reflections\n\n`;
+    if (weeklyReflections.length === 0) {
+      markdown += `_No weekly reflections_\n\n`;
+    } else {
+      const sortedReflections = [...weeklyReflections].sort(
+        (a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
+      );
+      for (const reflection of sortedReflections) {
+        markdown += `### Week of ${reflection.weekStart}\n\n`;
+        markdown += `${reflection.reflection}\n\n`;
+        markdown += `**Stats:**\n`;
+        markdown += `- Journal entries: ${reflection.stats.journalEntryCount}\n`;
+        markdown += `- Total words: ${reflection.stats.totalWords}\n`;
+        if (reflection.stats.avgMood !== null) {
+          markdown += `- Avg mood: ${reflection.stats.avgMood.toFixed(1)}/5\n`;
+        }
+        if (reflection.stats.avgEnergy !== null) {
+          markdown += `- Avg energy: ${reflection.stats.avgEnergy.toFixed(1)}/5\n`;
+        }
+        markdown += `\n---\n\n`;
+      }
+    }
+
+    // Bookmarks
+    markdown += `## X Bookmarks\n\n`;
+    if (bookmarks.length === 0) {
+      markdown += `_No bookmarks_\n\n`;
+    } else {
+      for (const bookmark of bookmarks) {
+        markdown += `### @${bookmark.author}\n\n`;
+        markdown += `${bookmark.text}\n\n`;
+        markdown += `[View on X](${bookmark.url}) | Saved: ${new Date(bookmark.savedAt).toLocaleDateString()}\n\n`;
+        markdown += `---\n\n`;
+      }
+    }
+
+    // Interest Areas
+    markdown += `## Interest Areas\n\n`;
+    if (interestAreas.length === 0) {
+      markdown += `_No interest areas_\n\n`;
+    } else {
+      for (const area of interestAreas) {
+        markdown += `- **${area.name}** ${area.enabled ? '(enabled)' : '(disabled)'}\n`;
+        markdown += `  - Keywords: ${area.keywords.join(', ')}\n`;
+      }
+      markdown += `\n`;
+    }
+
+    // Download the file
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `daily-dashboard-export-${dateStr}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearAllData = () => {
+    clearAllData();
+    setShowClearConfirm(false);
+    setClearConfirmText('');
+    setSettingsOpen(false);
   };
 
   return (
@@ -255,6 +433,83 @@ export function SettingsPanel() {
                     <option value="tactical">Tactical</option>
                     <option value="gratitude">Gratitude</option>
                   </select>
+                </div>
+
+                {/* Custom prompt instructions per style */}
+                <div>
+                  <label className="font-ui text-sm font-medium text-ink block mb-2">
+                    Custom AI prompt instructions
+                  </label>
+                  <p className="font-ui text-xs text-ink-muted mb-3">
+                    Give Claude specific guidance for each prompt style. Click a style to add custom instructions.
+                  </p>
+                  <div className="space-y-2">
+                    {(Object.keys(promptStyleLabels) as JournalPromptStyleType[]).map((style) => {
+                      const isExpanded = expandedPromptStyle === style;
+                      const hasInstructions = settings.journalPromptInstructions?.[style];
+                      return (
+                        <div
+                          key={style}
+                          className="border border-warm-gray-dark rounded-lg overflow-hidden"
+                        >
+                          <button
+                            onClick={() => setExpandedPromptStyle(isExpanded ? null : style)}
+                            className={`
+                              w-full flex items-center justify-between p-3 text-left transition-colors
+                              ${isExpanded ? 'bg-warm-gray/50' : 'hover:bg-warm-gray/30'}
+                            `}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="font-ui text-sm font-medium text-ink">
+                                {promptStyleLabels[style].label}
+                              </span>
+                              {hasInstructions && (
+                                <span className="font-ui text-[10px] bg-terracotta-light text-terracotta-dark px-1.5 py-0.5 rounded">
+                                  Customized
+                                </span>
+                              )}
+                            </div>
+                            <ChevronDown
+                              className={`w-4 h-4 text-ink-muted transition-transform ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                          {isExpanded && (
+                            <div className="p-3 pt-0 border-t border-warm-gray/50">
+                              <p className="font-ui text-xs text-ink-muted mb-2 mt-2">
+                                {promptStyleLabels[style].description}
+                              </p>
+                              <textarea
+                                value={settings.journalPromptInstructions?.[style] || ''}
+                                onChange={(e) =>
+                                  updateSettings({
+                                    journalPromptInstructions: {
+                                      ...settings.journalPromptInstructions,
+                                      [style]: e.target.value,
+                                    },
+                                  })
+                                }
+                                placeholder={`e.g., ${
+                                  style === 'reflective'
+                                    ? 'Ask about my emotional patterns and personal growth'
+                                    : style === 'creative'
+                                    ? 'Focus on my music composition and projection mapping projects'
+                                    : style === 'tactical'
+                                    ? 'Help me prioritize my side projects'
+                                    : style === 'gratitude'
+                                    ? 'Include prompts about small daily moments'
+                                    : 'Balance between creative exploration and practical planning'
+                                }`}
+                                rows={2}
+                                className="input w-full resize-none text-sm"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Daily word target */}
@@ -445,6 +700,169 @@ export function SettingsPanel() {
                     Calendar access allows you to view and create events from your dashboard.
                     Your calendar data is only stored locally on your device.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'bookmarks' && (
+              <div className="space-y-6">
+                {/* Error message */}
+                {readwiseError && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-ui text-sm text-red-700">{readwiseError}</p>
+                      <button
+                        onClick={clearReadwiseError}
+                        className="font-ui text-xs text-red-500 hover:text-red-700 mt-1"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Readwise connection */}
+                <div>
+                  <label className="font-ui text-sm font-medium text-ink block mb-3">
+                    X Bookmarks via Readwise
+                  </label>
+
+                  {!isReadwiseConfigured ? (
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg border border-dashed border-warm-gray-dark">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
+                            <Twitter className="w-5 h-5 text-[#1DA1F2]" />
+                          </div>
+                          <div>
+                            <p className="font-ui text-sm font-medium text-ink">
+                              Connect Readwise Reader
+                            </p>
+                            <p className="font-ui text-xs text-ink-muted">
+                              Sync your X bookmarks to your dashboard
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="font-ui text-xs text-ink-muted block mb-1.5">
+                              Readwise Access Token
+                            </label>
+                            <input
+                              type="password"
+                              value={readwiseTokenInput}
+                              onChange={(e) => setReadwiseTokenInput(e.target.value)}
+                              placeholder="Enter your access token"
+                              className="input w-full text-sm"
+                            />
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (readwiseTokenInput.trim()) {
+                                const success = await setReadwiseToken(readwiseTokenInput.trim());
+                                if (success) {
+                                  setReadwiseTokenInput('');
+                                }
+                              }
+                            }}
+                            disabled={!readwiseTokenInput.trim() || isReadwiseLoading}
+                            className="btn btn-primary text-sm w-full disabled:opacity-50"
+                          >
+                            {isReadwiseLoading ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Connecting...
+                              </>
+                            ) : (
+                              <>
+                                <Check className="w-4 h-4" />
+                                Connect Readwise
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-warm-gray/30">
+                        <p className="font-ui text-xs text-ink-muted mb-2">
+                          <strong>Setup instructions:</strong>
+                        </p>
+                        <ol className="font-ui text-xs text-ink-muted list-decimal list-inside space-y-1">
+                          <li>
+                            Get your access token at{' '}
+                            <a
+                              href="https://readwise.io/access_token"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-terracotta hover:text-terracotta-dark inline-flex items-center gap-0.5"
+                            >
+                              readwise.io/access_token
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </li>
+                          <li>
+                            Ensure X/Twitter is connected in{' '}
+                            <a
+                              href="https://readwise.io/reader_integrations"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-terracotta hover:text-terracotta-dark inline-flex items-center gap-0.5"
+                            >
+                              Readwise Reader settings
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </li>
+                          <li>Paste your token above and connect</li>
+                        </ol>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Connected state */}
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-sage-light/30 border border-sage/20">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm">
+                            <Twitter className="w-5 h-5 text-[#1DA1F2]" />
+                          </div>
+                          <div>
+                            <p className="font-ui text-sm font-medium text-ink">
+                              Readwise Reader
+                            </p>
+                            <p className="font-ui text-xs text-sage-dark">
+                              <Check className="w-3 h-3 inline mr-1" />
+                              Connected ({readwiseBookmarks.length} bookmarks)
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={refreshBookmarks}
+                            disabled={isReadwiseLoading}
+                            className="btn-ghost p-2 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
+                            title="Refresh bookmarks"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${isReadwiseLoading ? 'animate-spin' : ''}`} />
+                          </button>
+                          <button
+                            onClick={clearReadwiseToken}
+                            className="btn-ghost p-2 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
+                            title="Disconnect"
+                          >
+                            <LogOut className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-warm-gray/30">
+                        <p className="font-ui text-xs text-ink-muted">
+                          Bookmarks are synced from Readwise Reader. When you bookmark a tweet on X,
+                          it will appear here within a few minutes after Readwise syncs.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -754,49 +1172,71 @@ export function SettingsPanel() {
                       Export all data
                     </label>
                     <p className="font-ui text-xs text-ink-muted mt-0.5">
-                      Download a copy of all your data
+                      Download a structured Markdown file with all your data
                     </p>
                   </div>
-                  <button className="btn btn-secondary text-sm">
+                  <button
+                    onClick={handleExportMarkdown}
+                    className="btn btn-secondary text-sm"
+                  >
                     <Download className="w-4 h-4" />
                     Export
                   </button>
-                </div>
-
-                {/* Export format */}
-                <div>
-                  <label className="font-ui text-sm font-medium text-ink block mb-2">
-                    Export format
-                  </label>
-                  <select
-                    value={settings.dataExportFormat}
-                    onChange={(e) =>
-                      updateSettings({
-                        dataExportFormat: e.target.value as typeof settings.dataExportFormat,
-                      })
-                    }
-                    className="input w-full"
-                  >
-                    <option value="json">JSON</option>
-                    <option value="csv">CSV</option>
-                  </select>
                 </div>
 
                 {/* Delete data */}
                 <div className="p-4 rounded-lg border border-red-200 bg-red-50">
                   <div className="flex items-start gap-3">
                     <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0" />
-                    <div>
+                    <div className="flex-1">
                       <label className="font-ui text-sm font-medium text-red-700 block">
                         Delete all data
                       </label>
                       <p className="font-ui text-xs text-red-600 mt-0.5 mb-3">
-                        This will permanently delete all your habits, journal entries, and settings.
-                        This action cannot be undone.
+                        This will permanently delete all your habits, journal entries, reflections,
+                        bookmarks, and settings. This action cannot be undone.
                       </p>
-                      <button className="btn text-sm bg-red-500 text-white hover:bg-red-600">
-                        Delete everything
-                      </button>
+
+                      {!showClearConfirm ? (
+                        <button
+                          onClick={() => setShowClearConfirm(true)}
+                          className="btn text-sm bg-red-500 text-white hover:bg-red-600"
+                        >
+                          Delete everything
+                        </button>
+                      ) : (
+                        <div className="space-y-3 p-3 bg-red-100 rounded-lg">
+                          <p className="font-ui text-xs text-red-800 font-medium">
+                            Type "DELETE" to confirm:
+                          </p>
+                          <input
+                            type="text"
+                            value={clearConfirmText}
+                            onChange={(e) => setClearConfirmText(e.target.value)}
+                            placeholder="DELETE"
+                            className="input w-full text-sm border-red-300 focus:border-red-500"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleClearAllData}
+                              disabled={clearConfirmText !== 'DELETE'}
+                              className="btn text-sm bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              Confirm Delete
+                            </button>
+                            <button
+                              onClick={() => {
+                                setShowClearConfirm(false);
+                                setClearConfirmText('');
+                              }}
+                              className="btn btn-secondary text-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

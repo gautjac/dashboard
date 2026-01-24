@@ -19,6 +19,7 @@ import type {
   DailyBrief,
   DailyBriefItem,
   InterestArea,
+  JournalPromptStyleInstructions,
 } from '../types';
 
 // API Configuration
@@ -118,7 +119,8 @@ class AnthropicService {
   async generateContextualPrompt(
     recentEntries: JournalEntry[],
     habits: HabitWithStats[],
-    promptStyle: 'reflective' | 'creative' | 'tactical' | 'gratitude' | 'mixed'
+    promptStyle: 'reflective' | 'creative' | 'tactical' | 'gratitude' | 'mixed',
+    styleInstructionsMap?: JournalPromptStyleInstructions
   ): Promise<string> {
     const entriesSummary = recentEntries
       .slice(0, 5)
@@ -137,6 +139,12 @@ class AnthropicService {
       mixed: 'Choose the most appropriate style based on the context.',
     };
 
+    // Get custom instructions for this specific style
+    const customInstructions = styleInstructionsMap?.[promptStyle];
+    const customInstructionsSection = customInstructions
+      ? `\n\nAdditional instructions from the user for ${promptStyle} prompts:\n${customInstructions}`
+      : '';
+
     const response = await this.makeRequest(
       [
         {
@@ -149,7 +157,7 @@ ${entriesSummary || 'No recent entries'}
 Current habits:
 ${habitsSummary || 'No habits tracked'}
 
-Style: ${styleInstructions[promptStyle]}
+Style: ${styleInstructions[promptStyle]}${customInstructionsSection}
 
 Return ONLY the prompt question itself, nothing else. Make it personal and specific to their situation.`,
         },
@@ -439,6 +447,63 @@ Make the items feel current and relevant. The "why it matters" should connect to
         generatedAt: new Date().toISOString(),
       };
     }
+  }
+
+  /**
+   * Generate a creative weekly reflection based on journal entries and habits
+   */
+  async generateWeeklyReflection(
+    recentEntries: JournalEntry[],
+    habits: HabitWithStats[]
+  ): Promise<string> {
+    const entriesContent = recentEntries
+      .map(
+        (e) =>
+          `${e.date} (mood: ${e.mood || 'N/A'}/5, energy: ${e.energy || 'N/A'}/5):
+${e.content}`
+      )
+      .join('\n\n---\n\n');
+
+    const habitsContent = habits
+      .map(
+        (h) =>
+          `${h.name}: ${h.currentStreak} day streak, ${h.completionRate7Days}% completion this week${
+            h.todayCompleted ? ' (done today)' : ''
+          }`
+      )
+      .join('\n');
+
+    const response = await this.makeRequest(
+      [
+        {
+          role: 'user',
+          content: `You are reviewing someone's week. Based on their journal entries and habit tracking, write a warm, creative, and insightful reflection on how their week has been going.
+
+JOURNAL ENTRIES (last 7 days):
+${entriesContent || 'No journal entries this week.'}
+
+HABIT TRACKING:
+${habitsContent || 'No habits tracked.'}
+
+Write a reflection that:
+1. Opens with a creative metaphor or image that captures the essence of their week
+2. Acknowledges specific things they wrote about or accomplished
+3. Notes patterns you observe (mood trends, recurring themes, habit momentum)
+4. Offers a gentle observation or reframe if they seem to be struggling
+5. Ends with an encouraging thought or question to carry into the next week
+
+Keep it personal, warm, and around 200-300 words. Write in second person ("you"). Be specific - reference actual things from their entries. Avoid generic self-help platitudes.`,
+        },
+      ],
+      {
+        system:
+          'You are a wise, warm friend who has known this person for years. You speak with genuine care, wit, and insight. You notice patterns and offer perspective without being preachy. Your tone is encouraging but never saccharine.',
+        maxTokens: 600,
+      }
+    );
+
+    const textBlock = response.content.find((c) => c.type === 'text');
+    return textBlock?.text || 'Unable to generate reflection. Please try again.';
   }
 }
 

@@ -110,12 +110,23 @@ export interface FocusLine {
   createdAt: string;
 }
 
+export type JournalPromptStyleType = 'reflective' | 'creative' | 'tactical' | 'gratitude' | 'mixed';
+
+export interface JournalPromptStyleInstructions {
+  reflective?: string;
+  creative?: string;
+  tactical?: string;
+  gratitude?: string;
+  mixed?: string;
+}
+
 export interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
   showWeather: boolean;
   weatherLocation?: string;
   dailyBriefLength: 'short' | 'medium' | 'long';
-  journalPromptStyle: 'reflective' | 'creative' | 'tactical' | 'gratitude' | 'mixed';
+  journalPromptStyle: JournalPromptStyleType;
+  journalPromptInstructions?: JournalPromptStyleInstructions; // Per-style custom instructions
   computerAccessEnabled: boolean;
   aiAnalysisEnabled: boolean;
   dataExportFormat: 'json' | 'csv';
@@ -150,6 +161,46 @@ export interface JournalPrompt {
   contextual?: boolean; // Uses habits/calendar data
 }
 
+// Readwise Bookmarks (X/Twitter)
+export interface ReadwiseDocument {
+  id: string;
+  url: string;
+  source_url: string;
+  title: string;
+  author: string;
+  content?: string;
+  summary?: string;
+  category: string;
+  created_at: string;
+  updated_at: string;
+  published_date?: string;
+}
+
+export interface Bookmark {
+  id: string;
+  text: string;
+  author: string;
+  url: string;
+  savedAt: string;
+}
+
+// Weekly Reflection (AI-generated)
+export interface WeeklyReflection {
+  id: string;
+  weekStart: string; // YYYY-MM-DD (Monday of the week)
+  weekEnd: string; // YYYY-MM-DD (Sunday of the week)
+  reflection: string;
+  stats: {
+    journalEntryCount: number;
+    totalWords: number;
+    avgMood: number | null;
+    avgEnergy: number | null;
+    avgHabitCompletion: number | null;
+    topStreaks: { habitName: string; streak: number }[];
+  };
+  generatedAt: string;
+}
+
 // App State
 export interface DashboardState {
   // Core data
@@ -168,6 +219,11 @@ export interface DashboardState {
 
   // Insights
   weeklyInsights: WeeklyInsight[];
+  weeklyReflections: WeeklyReflection[];
+
+  // Bookmarks
+  readwiseToken: string | null;
+  bookmarks: Bookmark[];
 
   // Settings
   settings: UserSettings;

@@ -13,6 +13,8 @@ import type {
   DailyBrief,
   UserSettings,
   WeeklyInsight,
+  WeeklyReflection,
+  Bookmark,
 } from '../types';
 import { syncService } from '../services/syncService';
 
@@ -27,6 +29,9 @@ interface DashboardStore {
   interestAreas: InterestArea[];
   dailyBriefs: DailyBrief[];
   weeklyInsights: WeeklyInsight[];
+  weeklyReflections: WeeklyReflection[];
+  readwiseToken: string | null;
+  bookmarks: Bookmark[];
   settings: UserSettings;
 
   // UI State
@@ -71,6 +76,16 @@ interface DashboardStore {
   // Settings Actions
   updateSettings: (updates: Partial<UserSettings>) => void;
 
+  // Weekly Reflection Actions
+  addWeeklyReflection: (reflection: Omit<WeeklyReflection, 'id'>) => void;
+  getWeeklyReflection: (weekStart: string) => WeeklyReflection | null;
+  getAllWeeklyReflections: () => WeeklyReflection[];
+
+  // Bookmark Actions
+  setReadwiseToken: (token: string | null) => void;
+  setBookmarks: (bookmarks: Bookmark[]) => void;
+  clearBookmarks: () => void;
+
   // UI Actions
   setCurrentView: (view: DashboardStore['currentView']) => void;
   setSelectedDate: (date: string) => void;
@@ -84,6 +99,9 @@ interface DashboardStore {
   setSyncEnabled: (enabled: boolean, userId?: string) => void;
   syncToServer: () => Promise<void>;
   loadFromServer: () => Promise<void>;
+
+  // Data Management
+  clearAllData: () => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -167,6 +185,9 @@ export const useDashboardStore = create<DashboardStore>()(
       interestAreas: [],
       dailyBriefs: [],
       weeklyInsights: [],
+      weeklyReflections: [],
+      readwiseToken: null,
+      bookmarks: [],
       settings: {
         theme: 'light',
         showWeather: false,
@@ -435,6 +456,40 @@ export const useDashboardStore = create<DashboardStore>()(
         }));
       },
 
+      // Weekly Reflection Actions
+      addWeeklyReflection: (reflection) => {
+        const id = generateId();
+        set(state => {
+          // Check if we already have a reflection for this week - update it if so
+          const existingIndex = state.weeklyReflections.findIndex(
+            r => r.weekStart === reflection.weekStart
+          );
+          if (existingIndex >= 0) {
+            const updated = [...state.weeklyReflections];
+            updated[existingIndex] = { ...reflection, id: state.weeklyReflections[existingIndex].id };
+            return { weeklyReflections: updated };
+          }
+          return {
+            weeklyReflections: [...state.weeklyReflections, { ...reflection, id }],
+          };
+        });
+      },
+
+      getWeeklyReflection: (weekStart) => {
+        return get().weeklyReflections.find(r => r.weekStart === weekStart) || null;
+      },
+
+      getAllWeeklyReflections: () => {
+        return get().weeklyReflections.sort(
+          (a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime()
+        );
+      },
+
+      // Bookmark Actions
+      setReadwiseToken: (token) => set({ readwiseToken: token }),
+      setBookmarks: (bookmarks) => set({ bookmarks }),
+      clearBookmarks: () => set({ bookmarks: [], readwiseToken: null }),
+
       // UI Actions
       setCurrentView: (view) => set({ currentView: view }),
       setSelectedDate: (date) => set({ selectedDate: date }),
@@ -508,6 +563,40 @@ export const useDashboardStore = create<DashboardStore>()(
           set({ syncStatus: 'error' });
         }
       },
+
+      // Data Management
+      clearAllData: () => {
+        set({
+          habits: [],
+          habitCompletions: [],
+          journalEntries: [],
+          focusLines: [],
+          calendarAccounts: [],
+          calendarEvents: [],
+          interestAreas: [],
+          dailyBriefs: [],
+          weeklyInsights: [],
+          weeklyReflections: [],
+          readwiseToken: null,
+          bookmarks: [],
+          settings: {
+            theme: 'light',
+            showWeather: false,
+            dailyBriefLength: 'medium',
+            journalPromptStyle: 'mixed',
+            computerAccessEnabled: false,
+            aiAnalysisEnabled: true,
+            dataExportFormat: 'json',
+          },
+          syncEnabled: false,
+          lastSyncedAt: null,
+        });
+        // Clear localStorage items for external services
+        localStorage.removeItem('gcal_access_token');
+        localStorage.removeItem('gcal_token_expiry');
+        localStorage.removeItem('gcal_user_email');
+        localStorage.removeItem('readwise_access_token');
+      },
     }),
     {
       name: 'daily-dashboard-storage',
@@ -520,6 +609,9 @@ export const useDashboardStore = create<DashboardStore>()(
         interestAreas: state.interestAreas,
         dailyBriefs: state.dailyBriefs,
         weeklyInsights: state.weeklyInsights,
+        weeklyReflections: state.weeklyReflections,
+        readwiseToken: state.readwiseToken,
+        bookmarks: state.bookmarks,
         settings: state.settings,
         syncEnabled: state.syncEnabled,
       }),

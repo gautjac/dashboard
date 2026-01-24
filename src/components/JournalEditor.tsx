@@ -72,7 +72,7 @@ export function JournalEditor() {
   const [tagInput, setTagInput] = useState('');
   const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(getTodayPrompt());
   const [aiPrompt, setAiPrompt] = useState<string | null>(null);
-  const [showPrompt, setShowPrompt] = useState(!todayEntry?.content);
+  const [showPrompt, setShowPrompt] = useState(true); // Always show prompt initially
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
@@ -156,6 +156,20 @@ export function JournalEditor() {
   };
 
   const displayedPrompt = aiPrompt || currentPrompt.text;
+
+  // Insert prompt into content
+  const useCurrentPrompt = () => {
+    const promptText = `**${displayedPrompt}**\n\n`;
+    const newContent = content ? `${content}\n\n${promptText}` : promptText;
+    setContent(newContent);
+
+    // Focus textarea after inserting
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const length = newContent.length;
+      textareaRef.current.setSelectionRange(length, length);
+    }
+  };
 
   const addTag = (tag: string) => {
     const normalizedTag = tag.toLowerCase().trim();
@@ -243,7 +257,7 @@ export function JournalEditor() {
                       <Sparkles className="w-4 h-4 text-terracotta" />
                     )}
                     <span className="font-ui text-xs text-terracotta-dark uppercase tracking-wider">
-                      {aiPrompt ? 'AI Prompt' : 'Prompt'}
+                      {aiPrompt ? 'AI Prompt' : 'Writing Prompt'}
                     </span>
                     {isAIConfigured && !aiPrompt && (
                       <span className="font-ui text-[10px] text-ink-muted bg-warm-gray px-1.5 py-0.5 rounded">
@@ -251,23 +265,13 @@ export function JournalEditor() {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={refreshPrompt}
-                      disabled={isGeneratingPrompt}
-                      className="p-1.5 rounded-md text-terracotta hover:bg-terracotta-light/30 transition-colors disabled:opacity-50"
-                      title={isAIConfigured ? "Generate AI prompt" : "Get new prompt"}
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingPrompt ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button
-                      onClick={() => setShowPrompt(false)}
-                      className="p-1.5 rounded-md text-ink-muted hover:bg-warm-gray transition-colors"
-                      title="Hide prompt"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setShowPrompt(false)}
+                    className="p-1.5 rounded-md text-ink-muted hover:bg-warm-gray transition-colors"
+                    title="Hide prompts"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
                 {isGeneratingPrompt ? (
                   <p className="font-body text-base text-ink-muted mt-2 italic">
@@ -278,6 +282,27 @@ export function JournalEditor() {
                     {displayedPrompt}
                   </p>
                 )}
+                {/* Prompt action buttons */}
+                <div className="flex items-center gap-2 mt-3">
+                  <button
+                    onClick={useCurrentPrompt}
+                    disabled={isGeneratingPrompt}
+                    className="btn btn-secondary text-xs py-1.5 px-3"
+                    title="Add this prompt to your entry"
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    Use This Prompt
+                  </button>
+                  <button
+                    onClick={refreshPrompt}
+                    disabled={isGeneratingPrompt}
+                    className="btn-ghost text-xs py-1.5 px-3 rounded-lg text-terracotta hover:bg-terracotta-light/20"
+                    title={isAIConfigured ? "Generate new AI prompt" : "Get a different prompt"}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingPrompt ? 'animate-spin' : ''}`} />
+                    New Prompt
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -415,10 +440,11 @@ export function JournalEditor() {
             {!showPrompt && (
               <button
                 onClick={() => setShowPrompt(true)}
-                className="btn-ghost p-2 rounded-lg text-ink-muted hover:text-ink"
-                title="Show prompt"
+                className="btn-ghost flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg text-terracotta hover:bg-terracotta-light/20"
+                title="Show writing prompts"
               >
-                <Wand2 className="w-4 h-4" />
+                <Sparkles className="w-4 h-4" />
+                <span className="font-ui text-xs">Prompts</span>
               </button>
             )}
             <span className="font-ui text-xs text-ink-muted">

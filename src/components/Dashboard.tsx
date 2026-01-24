@@ -11,9 +11,10 @@ import { CalendarWidget } from './CalendarWidget';
 import { HabitsWidget } from './HabitsWidget';
 import { JournalWidget } from './JournalWidget';
 import { DailyBriefWidget } from './DailyBriefWidget';
+import { BookmarksWidget } from './BookmarksWidget';
 import { SettingsPanel } from './SettingsPanel';
 import { JournalEditor } from './JournalEditor';
-import { AgentPanel } from './AgentPanel';
+import { WeeklyReflectionPanel } from './WeeklyReflectionPanel';
 import {
   sampleHabits,
   sampleHabitCompletions,
@@ -29,11 +30,10 @@ export function Dashboard() {
     settingsOpen,
     journalEditorOpen,
     setSettingsOpen,
-    settings,
   } = useDashboardStore();
 
   const { user, logout } = useAuth();
-  const [agentPanelOpen, setAgentPanelOpen] = useState(false);
+  const [reflectionPanelOpen, setReflectionPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Auto-sync data when changes occur
@@ -86,16 +86,14 @@ export function Dashboard() {
                   {user.email}
                 </span>
               )}
-              {settings.computerAccessEnabled && (
-                <button
-                  onClick={() => setAgentPanelOpen(true)}
-                  className="btn-ghost p-2 rounded-lg relative"
-                  aria-label="Agent Assistant"
-                  title="Agent Assistant"
-                >
-                  <Bot className="w-5 h-5" />
-                </button>
-              )}
+              <button
+                onClick={() => setReflectionPanelOpen(true)}
+                className="btn-ghost p-2 rounded-lg relative"
+                aria-label="Weekly Reflection"
+                title="Weekly Reflection"
+              >
+                <Bot className="w-5 h-5" />
+              </button>
               <button
                 onClick={() => setSettingsOpen(true)}
                 className="btn-ghost p-2 rounded-lg"
@@ -132,18 +130,16 @@ export function Dashboard() {
                     {user.email}
                   </p>
                 )}
-                {settings.computerAccessEnabled && (
-                  <button
-                    onClick={() => {
-                      setAgentPanelOpen(true);
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left hover:bg-warm-gray/50"
-                  >
-                    <Bot className="w-5 h-5 text-ink-muted" />
-                    <span className="font-ui text-sm">Agent Assistant</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    setReflectionPanelOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left hover:bg-warm-gray/50"
+                >
+                  <Bot className="w-5 h-5 text-ink-muted" />
+                  <span className="font-ui text-sm">Weekly Reflection</span>
+                </button>
                 <button
                   onClick={() => {
                     setSettingsOpen(true);
@@ -188,6 +184,7 @@ export function Dashboard() {
             <div className="lg:col-span-5 space-y-6 stagger-children">
               <CalendarWidget />
               <DailyBriefWidget />
+              <BookmarksWidget />
             </div>
           </div>
         </div>
@@ -210,20 +207,20 @@ export function Dashboard() {
       {/* Journal Editor Modal */}
       {journalEditorOpen && <JournalEditor />}
 
-      {/* Agent Panel */}
-      {agentPanelOpen && (
+      {/* Weekly Reflection Panel */}
+      {reflectionPanelOpen && (
         <ErrorBoundary
           fallback={
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
               <div className="bg-cream p-6 rounded-xl max-w-md">
                 <h3 className="font-display text-lg font-semibold text-red-600 mb-2">
-                  Agent Panel Error
+                  Reflection Panel Error
                 </h3>
                 <p className="font-ui text-sm text-ink-muted mb-4">
-                  Something went wrong loading the Agent Panel. Check the browser console for details.
+                  Something went wrong loading the reflection. Check the browser console for details.
                 </p>
                 <button
-                  onClick={() => setAgentPanelOpen(false)}
+                  onClick={() => setReflectionPanelOpen(false)}
                   className="btn btn-primary text-sm"
                 >
                   Close
@@ -232,7 +229,7 @@ export function Dashboard() {
             </div>
           }
         >
-          <AgentPanel onClose={() => setAgentPanelOpen(false)} />
+          <WeeklyReflectionPanel onClose={() => setReflectionPanelOpen(false)} />
         </ErrorBoundary>
       )}
     </div>

@@ -108,7 +108,8 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
       const prompt = await anthropicService.generateContextualPrompt(
         journalEntries.slice(0, 5),
         habits,
-        settings.journalPromptStyle
+        settings.journalPromptStyle,
+        settings.journalPromptInstructions // Now passes the full style-specific instructions map
       );
 
       return prompt;
@@ -119,7 +120,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [isConfigured, journalEntries, getHabitsWithStats, settings.journalPromptStyle]);
+  }, [isConfigured, journalEntries, getHabitsWithStats, settings.journalPromptStyle, settings.journalPromptInstructions]);
 
   const generateEntryReflection = useCallback(
     async (entryId: string): Promise<string | null> => {
