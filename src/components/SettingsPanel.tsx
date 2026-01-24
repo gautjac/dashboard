@@ -104,13 +104,13 @@ export function SettingsPanel() {
         className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden"
         style={{ width: '90vw', maxWidth: '768px', maxHeight: '85vh' }}
       >
-        <div className="flex h-full" style={{ maxHeight: '85vh' }}>
+        <div className="flex h-full max-h-[85vh]">
           {/* Sidebar */}
-          <div className="w-14 sm:w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-2 sm:p-4 overflow-y-auto">
+          <div className="w-14 sm:w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-2 sm:p-4 flex flex-col">
             <h2 className="hidden sm:block font-display text-xl font-semibold text-ink mb-4 px-2">
               Settings
             </h2>
-            <nav className="space-y-1">
+            <nav className="space-y-1 flex-1 overflow-y-auto">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
