@@ -3,9 +3,16 @@ import { getDb, getUserIdFromContext, getUserEmailFromContext, ensureUser, jsonR
 
 export default async function handler(req: Request, context: Context) {
   const sql = getDb();
+  const url = new URL(req.url);
 
-  const netlifyUserId = getUserIdFromContext(context);
-  const email = getUserEmailFromContext(context);
+  // Try query params first (for Clawdbot/external access), then Netlify Identity
+  let netlifyUserId = url.searchParams.get('userId');
+  let email = url.searchParams.get('email');
+
+  if (!netlifyUserId || !email) {
+    netlifyUserId = getUserIdFromContext(context);
+    email = getUserEmailFromContext(context);
+  }
 
   if (!netlifyUserId || !email) {
     return unauthorizedResponse();
