@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import netlifyIdentity from 'netlify-identity-widget';
 import { useDashboardStore } from '../store';
 import type { Todo } from '../types';
 
@@ -12,9 +13,15 @@ interface UseTodosReturn {
   refreshTodos: () => Promise<void>;
 }
 
-// Get sync userId from localStorage (same as extension-bookmarks uses)
-function getSyncUserId(): string | null {
-  return localStorage.getItem('dashboard_user_id');
+// Get userId - try localStorage first (for sync), then Netlify Identity
+function getUserId(): string | null {
+  // First check localStorage (sync service)
+  const syncUserId = localStorage.getItem('dashboard_user_id');
+  if (syncUserId) return syncUserId;
+
+  // Fall back to Netlify Identity user ID
+  const user = netlifyIdentity.currentUser();
+  return user?.id || null;
 }
 
 // Helper to convert snake_case API response to camelCase
@@ -35,7 +42,7 @@ export function useTodos(): UseTodosReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTodos = useCallback(async () => {
-    const userId = getSyncUserId();
+    const userId = getUserId();
     if (!userId) {
       // Not authenticated, use local state only
       return;
@@ -71,7 +78,7 @@ export function useTodos(): UseTodosReturn {
   }, [fetchTodos]);
 
   const addTodo = useCallback(async (title: string, dueDate: string | null) => {
-    const userId = getSyncUserId();
+    const userId = getUserId();
     if (!userId) {
       throw new Error('Not authenticated');
     }
@@ -101,7 +108,7 @@ export function useTodos(): UseTodosReturn {
   }, [addTodoLocal, deleteTodoLocal, fetchTodos]);
 
   const toggleTodo = useCallback(async (id: string) => {
-    const userId = getSyncUserId();
+    const userId = getUserId();
     if (!userId) return;
 
     const todo = todos.find(t => t.id === id);
@@ -128,7 +135,7 @@ export function useTodos(): UseTodosReturn {
   }, [todos, toggleTodoLocal]);
 
   const deleteTodo = useCallback(async (id: string) => {
-    const userId = getSyncUserId();
+    const userId = getUserId();
     if (!userId) return;
 
     // Optimistically delete locally

@@ -2,10 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckSquare, Calendar, ArrowLeft, Check } from 'lucide-react';
 import { format } from 'date-fns';
+import netlifyIdentity from 'netlify-identity-widget';
 
-// Get sync userId from localStorage
-function getSyncUserId(): string | null {
-  return localStorage.getItem('dashboard_user_id');
+// Get userId - try localStorage first (for sync), then Netlify Identity
+function getUserId(): string | null {
+  // First check localStorage (sync service)
+  const syncUserId = localStorage.getItem('dashboard_user_id');
+  if (syncUserId) return syncUserId;
+
+  // Fall back to Netlify Identity user ID
+  const user = netlifyIdentity.currentUser();
+  return user?.id || null;
 }
 
 export function QuickAddTodo() {
@@ -25,7 +32,7 @@ export function QuickAddTodo() {
     e.preventDefault();
     if (!title.trim() || isSubmitting) return;
 
-    const userId = getSyncUserId();
+    const userId = getUserId();
     if (!userId) {
       setError('Please sign in to add tasks');
       return;
