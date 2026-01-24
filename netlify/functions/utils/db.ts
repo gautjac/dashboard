@@ -27,7 +27,7 @@ export function getUserEmailFromContext(context: any): string | null {
 }
 
 // Ensure user exists in database (create if not)
-export async function ensureUser(sql: any, netlifyUserId: string, email: string, name?: string) {
+export async function ensureUser(sql: any, netlifyUserId: string, email: string) {
   // Try to find existing user by email
   const existing = await sql`
     SELECT id FROM users WHERE email = ${email}
@@ -39,8 +39,8 @@ export async function ensureUser(sql: any, netlifyUserId: string, email: string,
 
   // Create new user
   const result = await sql`
-    INSERT INTO users (id, email, name)
-    VALUES (${netlifyUserId}, ${email}, ${name || email.split('@')[0]})
+    INSERT INTO users (id, email)
+    VALUES (${netlifyUserId}, ${email})
     ON CONFLICT (email) DO UPDATE SET email = ${email}
     RETURNING id
   `;
