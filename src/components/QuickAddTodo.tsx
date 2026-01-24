@@ -104,8 +104,8 @@ export function QuickAddTodo() {
       </header>
 
       {/* Form */}
-      <main className="flex-1 px-4 py-6">
-        <form onSubmit={handleSubmit} className="max-w-lg mx-auto space-y-4">
+      <main className="flex-1 p-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Task input */}
           <div>
             <label htmlFor="title" className="block font-ui text-sm font-medium text-ink mb-2">
@@ -117,9 +117,10 @@ export function QuickAddTodo() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter task..."
-              className="w-full px-4 py-3 rounded-xl border border-warm-gray bg-cream font-ui text-base text-ink placeholder:text-ink-muted focus:outline-none focus:border-terracotta focus:ring-2 focus:ring-terracotta/20"
+              className="block w-full px-4 py-3 rounded-xl border border-warm-gray bg-cream font-ui text-base text-ink placeholder:text-ink-muted focus:outline-none focus:border-terracotta focus:ring-2 focus:ring-terracotta/20"
               autoFocus
               autoComplete="off"
+              style={{ width: '100%' }}
             />
           </div>
 
@@ -129,13 +130,14 @@ export function QuickAddTodo() {
               Due date
             </label>
             <div className="relative">
-              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted" />
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-muted pointer-events-none" />
               <input
                 id="dueDate"
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-warm-gray bg-cream font-ui text-base text-ink focus:outline-none focus:border-terracotta focus:ring-2 focus:ring-terracotta/20"
+                className="block w-full pl-12 pr-4 py-3 rounded-xl border border-warm-gray bg-cream font-ui text-base text-ink focus:outline-none focus:border-terracotta focus:ring-2 focus:ring-terracotta/20"
+                style={{ width: '100%' }}
               />
             </div>
           </div>
@@ -159,17 +161,17 @@ export function QuickAddTodo() {
           <button
             type="submit"
             disabled={!title.trim() || isSubmitting}
-            className="w-full py-3 px-4 rounded-xl bg-ink text-parchment font-ui font-medium text-base hover:bg-ink/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="block w-full py-3 px-4 rounded-xl bg-ink text-parchment font-ui font-medium text-base hover:bg-ink/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'Adding...' : 'Add Task'}
           </button>
 
           {/* Quick actions */}
-          <div className="flex gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setDueDate(format(new Date(), 'yyyy-MM-dd'))}
-              className="flex-1 py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
+              className="py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
             >
               Today
             </button>
@@ -180,14 +182,14 @@ export function QuickAddTodo() {
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 setDueDate(format(tomorrow, 'yyyy-MM-dd'));
               }}
-              className="flex-1 py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
+              className="py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
             >
               Tomorrow
             </button>
             <button
               type="button"
               onClick={() => setDueDate('')}
-              className="flex-1 py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
+              className="py-2 px-3 rounded-lg border border-warm-gray font-ui text-sm text-ink-muted hover:bg-warm-gray/30 transition-colors"
             >
               No date
             </button>
