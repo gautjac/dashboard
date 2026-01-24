@@ -101,13 +101,45 @@ export function SettingsPanel() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden"
-        style={{ width: '90vw', maxWidth: '768px', maxHeight: '85vh' }}
+        className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden w-[95vw] sm:w-[90vw] max-w-[768px] h-[90vh] sm:h-auto sm:max-h-[85vh]"
       >
-        <div className="flex h-full max-h-[85vh]">
-          {/* Sidebar */}
-          <div className="w-14 sm:w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-2 sm:p-4 flex flex-col">
-            <h2 className="hidden sm:block font-display text-xl font-semibold text-ink mb-4 px-2">
+        <div className="flex flex-col sm:flex-row h-full">
+          {/* Mobile Header */}
+          <div className="sm:hidden flex items-center justify-between px-4 py-3 border-b border-warm-gray/50">
+            <h2 className="font-display text-lg font-semibold text-ink">Settings</h2>
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-warm-gray transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Mobile Tabs - Horizontal scrollable */}
+          <div className="sm:hidden overflow-x-auto border-b border-warm-gray/50 flex-shrink-0">
+            <nav className="flex px-2 py-2 gap-1 min-w-max">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-1.5 px-3 py-2 rounded-lg font-ui text-xs whitespace-nowrap transition-colors
+                    ${activeTab === tab.id
+                      ? 'bg-ink text-parchment'
+                      : 'text-ink-light hover:bg-warm-gray'
+                    }
+                  `}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Desktop Sidebar - Hidden on mobile */}
+          <div className="hidden sm:flex w-48 flex-shrink-0 bg-parchment-dark/50 border-r border-warm-gray/50 p-4 flex-col">
+            <h2 className="font-display text-xl font-semibold text-ink mb-4 px-2">
               Settings
             </h2>
             <nav className="space-y-1 flex-1 overflow-y-auto">
@@ -116,16 +148,15 @@ export function SettingsPanel() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    w-full flex items-center justify-center sm:justify-start gap-2.5 p-2.5 sm:px-3 sm:py-2 rounded-lg font-ui text-sm transition-colors
+                    w-full flex items-center gap-2.5 px-3 py-2 rounded-lg font-ui text-sm transition-colors
                     ${activeTab === tab.id
                       ? 'bg-ink text-parchment'
                       : 'text-ink-light hover:bg-warm-gray'
                     }
                   `}
-                  title={tab.label}
                 >
                   {tab.icon}
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </nav>
@@ -133,18 +164,18 @@ export function SettingsPanel() {
 
           {/* Content */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-warm-gray/50">
-            <h3 className="font-display text-lg font-semibold text-ink">
-              {tabs.find((t) => t.id === activeTab)?.label}
-            </h3>
-            <button
-              onClick={handleClose}
-              className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-warm-gray transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+            {/* Desktop Header - Hidden on mobile */}
+            <div className="hidden sm:flex items-center justify-between px-6 py-4 border-b border-warm-gray/50">
+              <h3 className="font-display text-lg font-semibold text-ink">
+                {tabs.find((t) => t.id === activeTab)?.label}
+              </h3>
+              <button
+                onClick={handleClose}
+                className="p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-warm-gray transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
           {/* Content area */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
