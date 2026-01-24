@@ -13,15 +13,22 @@ interface UseTodosReturn {
   refreshTodos: () => Promise<void>;
 }
 
-// Get userId - try localStorage first (for sync), then Netlify Identity
-function getUserId(): string | null {
+// Get user info - try localStorage first (for sync), then Netlify Identity
+function getUserInfo(): { userId: string; email: string } | null {
   // First check localStorage (sync service)
   const syncUserId = localStorage.getItem('dashboard_user_id');
-  if (syncUserId) return syncUserId;
+  const syncEmail = localStorage.getItem('dashboard_user_email');
+  if (syncUserId && syncEmail) {
+    return { userId: syncUserId, email: syncEmail };
+  }
 
-  // Fall back to Netlify Identity user ID
+  // Fall back to Netlify Identity user
   const user = netlifyIdentity.currentUser();
-  return user?.id || null;
+  if (user?.id && user?.email) {
+    return { userId: user.id, email: user.email };
+  }
+
+  return null;
 }
 
 // Helper to convert snake_case API response to camelCase
@@ -42,8 +49,8 @@ export function useTodos(): UseTodosReturn {
   const [error, setError] = useState<string | null>(null);
 
   const fetchTodos = useCallback(async () => {
-    const userId = getUserId();
-    if (!userId) {
+    const userInfo = getUserInfo();
+    if (!userInfo) {
       // Not authenticated, use local state only
       return;
     }
@@ -51,7 +58,11 @@ export function useTodos(): UseTodosReturn {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/.netlify/functions/todos?userId=${encodeURIComponent(userId)}`);
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -78,8 +89,8 @@ export function useTodos(): UseTodosReturn {
   }, [fetchTodos]);
 
   const addTodo = useCallback(async (title: string, dueDate: string | null) => {
-    const userId = getUserId();
-    if (!userId) {
+    const userInfo = getUserInfo();
+    if (!userInfo) {
       throw new Error('Not authenticated');
     }
 
@@ -88,7 +99,11 @@ export function useTodos(): UseTodosReturn {
     addTodoLocal({ title, dueDate });
 
     try {
-      const response = await fetch(`/.netlify/functions/todos?userId=${encodeURIComponent(userId)}`, {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, dueDate }),
@@ -108,8 +123,8 @@ export function useTodos(): UseTodosReturn {
   }, [addTodoLocal, deleteTodoLocal, fetchTodos]);
 
   const toggleTodo = useCallback(async (id: string) => {
-    const userId = getUserId();
-    if (!userId) return;
+    const userInfo = getUserInfo();
+    if (!userInfo) return;
 
     const todo = todos.find(t => t.id === id);
     if (!todo) return;
@@ -118,7 +133,12 @@ export function useTodos(): UseTodosReturn {
     toggleTodoLocal(id);
 
     try {
-      const response = await fetch(`/.netlify/functions/todos?userId=${encodeURIComponent(userId)}&id=${id}`, {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+        id,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ completed: !todo.completed }),
@@ -135,14 +155,19 @@ export function useTodos(): UseTodosReturn {
   }, [todos, toggleTodoLocal]);
 
   const deleteTodo = useCallback(async (id: string) => {
-    const userId = getUserId();
-    if (!userId) return;
+    const userInfo = getUserInfo();
+    if (!userInfo) return;
 
     // Optimistically delete locally
     deleteTodoLocal(id);
 
     try {
-      const response = await fetch(`/.netlify/functions/todos?userId=${encodeURIComponent(userId)}&id=${id}`, {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+        id,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`, {
         method: 'DELETE',
       });
 

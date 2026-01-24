@@ -4,15 +4,22 @@ import { CheckSquare, Calendar, ArrowLeft, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import netlifyIdentity from 'netlify-identity-widget';
 
-// Get userId - try localStorage first (for sync), then Netlify Identity
-function getUserId(): string | null {
+// Get user info - try localStorage first (for sync), then Netlify Identity
+function getUserInfo(): { userId: string; email: string } | null {
   // First check localStorage (sync service)
   const syncUserId = localStorage.getItem('dashboard_user_id');
-  if (syncUserId) return syncUserId;
+  const syncEmail = localStorage.getItem('dashboard_user_email');
+  if (syncUserId && syncEmail) {
+    return { userId: syncUserId, email: syncEmail };
+  }
 
-  // Fall back to Netlify Identity user ID
+  // Fall back to Netlify Identity user
   const user = netlifyIdentity.currentUser();
-  return user?.id || null;
+  if (user?.id && user?.email) {
+    return { userId: user.id, email: user.email };
+  }
+
+  return null;
 }
 
 export function QuickAddTodo() {
@@ -32,8 +39,8 @@ export function QuickAddTodo() {
     e.preventDefault();
     if (!title.trim() || isSubmitting) return;
 
-    const userId = getUserId();
-    if (!userId) {
+    const userInfo = getUserInfo();
+    if (!userInfo) {
       setError('Please sign in to add tasks');
       return;
     }
@@ -42,7 +49,11 @@ export function QuickAddTodo() {
     setError(null);
 
     try {
-      const response = await fetch(`/.netlify/functions/todos?userId=${encodeURIComponent(userId)}`, {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

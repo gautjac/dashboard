@@ -1,16 +1,20 @@
 import type { Context } from '@netlify/functions';
-import { getDb, jsonResponse, errorResponse } from './utils/db';
+import { getDb, ensureUser, jsonResponse, errorResponse } from './utils/db';
 
 export default async function handler(req: Request, _context: Context) {
   const sql = getDb();
   const url = new URL(req.url);
 
-  // Get userId from query parameter (same pattern as extension-bookmarks)
-  const userId = url.searchParams.get('userId');
+  // Get userId and email from query parameters
+  const netlifyUserId = url.searchParams.get('userId');
+  const email = url.searchParams.get('email');
 
-  if (!userId) {
-    return errorResponse('userId is required', 401);
+  if (!netlifyUserId || !email) {
+    return errorResponse('userId and email are required', 401);
   }
+
+  // Ensure user exists in database (creates if needed)
+  const userId = await ensureUser(sql, netlifyUserId, email);
 
   const todoId = url.searchParams.get('id');
 
