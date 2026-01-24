@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Bookmark as BookmarkIcon,
   ExternalLink,
@@ -8,9 +8,11 @@ import {
   Twitter,
   ChevronDown,
   ChevronUp,
+  Puzzle,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useReadwiseBookmarks } from '../hooks/useReadwiseBookmarks';
+import { useExtensionBookmarks } from '../hooks/useExtensionBookmarks';
 import { useDashboardStore } from '../store';
 import { formatDistanceToNow } from 'date-fns';
 import type { Bookmark } from '../types';
@@ -47,8 +49,22 @@ function BookmarkItem({ bookmark, index }: BookmarkItemProps) {
               {bookmark.author}
             </span>
             <span className="font-ui text-xs text-ink-muted">
-              {formatDistanceToNow(new Date(bookmark.savedAt), { addSuffix: true })}
+              {(() => {
+                try {
+                  const date = new Date(bookmark.savedAt);
+                  if (isNaN(date.getTime())) return 'recently';
+                  return formatDistanceToNow(date, { addSuffix: true });
+                } catch {
+                  return 'recently';
+                }
+              })()}
             </span>
+            {bookmark.source === 'extension' && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-terracotta/10 text-terracotta text-[10px] font-medium">
+                <Puzzle className="w-2.5 h-2.5" />
+                ext
+              </span>
+            )}
           </div>
 
           {/* Tweet text */}
@@ -92,11 +108,68 @@ function BookmarkItem({ bookmark, index }: BookmarkItemProps) {
 
 export function BookmarksWidget() {
   const { setSettingsOpen } = useDashboardStore();
-  const { isConfigured, isLoading, error, bookmarks, refreshBookmarks, clearError } =
-    useReadwiseBookmarks();
+  const {
+    isConfigured: isReadwiseConfigured,
+    isLoading: isReadwiseLoading,
+    error: readwiseError,
+    bookmarks: readwiseBookmarks,
+    refreshBookmarks: refreshReadwiseBookmarks,
+    clearError: clearReadwiseError,
+  } = useReadwiseBookmarks();
+
+  const {
+    bookmarks: extensionBookmarks,
+    isLoading: isExtensionLoading,
+    error: extensionError,
+    refreshBookmarks: refreshExtensionBookmarks,
+  } = useExtensionBookmarks();
+
   const [showAll, setShowAll] = useState(false);
 
-  const displayedBookmarks = showAll ? bookmarks : bookmarks.slice(0, 5);
+  // Merge and dedupe bookmarks from both sources
+  const allBookmarks = useMemo(() => {
+    const combined: Bookmark[] = [];
+    const seenUrls = new Set<string>();
+
+    // Add extension bookmarks first (they're more recent)
+    for (const bookmark of extensionBookmarks) {
+      const normalizedUrl = bookmark.url.replace(/^https?:\/\/(www\.)?(twitter|x)\.com/, '');
+      if (!seenUrls.has(normalizedUrl)) {
+        seenUrls.add(normalizedUrl);
+        combined.push({ ...bookmark, source: 'extension' });
+      }
+    }
+
+    // Add Readwise bookmarks, skipping duplicates
+    for (const bookmark of readwiseBookmarks) {
+      const normalizedUrl = bookmark.url.replace(/^https?:\/\/(www\.)?(twitter|x)\.com/, '');
+      if (!seenUrls.has(normalizedUrl)) {
+        seenUrls.add(normalizedUrl);
+        combined.push({ ...bookmark, source: 'readwise' });
+      }
+    }
+
+    // Sort by savedAt descending
+    return combined.sort((a, b) => {
+      const dateA = new Date(a.savedAt).getTime();
+      const dateB = new Date(b.savedAt).getTime();
+      if (isNaN(dateA) && isNaN(dateB)) return 0;
+      if (isNaN(dateA)) return 1;
+      if (isNaN(dateB)) return -1;
+      return dateB - dateA;
+    });
+  }, [readwiseBookmarks, extensionBookmarks]);
+
+  const isLoading = isReadwiseLoading || isExtensionLoading;
+  const error = readwiseError || extensionError;
+  const isConfigured = isReadwiseConfigured || extensionBookmarks.length > 0;
+
+  const handleRefresh = () => {
+    refreshReadwiseBookmarks();
+    refreshExtensionBookmarks();
+  };
+
+  const displayedBookmarks = showAll ? allBookmarks : allBookmarks.slice(0, 5);
 
   return (
     <motion.div
@@ -118,7 +191,7 @@ export function BookmarksWidget() {
             <button
               className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
               title="Refresh bookmarks"
-              onClick={refreshBookmarks}
+              onClick={handleRefresh}
               disabled={isLoading}
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -141,7 +214,7 @@ export function BookmarksWidget() {
           <div className="flex-1">
             <p className="font-ui text-sm text-red-700">{error}</p>
             <button
-              onClick={clearError}
+              onClick={clearReadwiseError}
               className="font-ui text-xs text-red-500 hover:text-red-700 mt-1"
             >
               Dismiss
@@ -170,7 +243,7 @@ export function BookmarksWidget() {
             Configure Readwise
           </button>
         </div>
-      ) : isLoading && bookmarks.length === 0 ? (
+      ) : isLoading && allBookmarks.length === 0 ? (
         // Loading state
         <div className="py-8 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center animate-pulse">
@@ -180,7 +253,7 @@ export function BookmarksWidget() {
             Loading your bookmarks...
           </p>
         </div>
-      ) : bookmarks.length === 0 ? (
+      ) : allBookmarks.length === 0 ? (
         // Empty state
         <div className="py-8 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
@@ -205,7 +278,7 @@ export function BookmarksWidget() {
           </div>
 
           {/* Show more / less */}
-          {bookmarks.length > 5 && (
+          {allBookmarks.length > 5 && (
             <button
               onClick={() => setShowAll(!showAll)}
               className="mt-4 w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
@@ -216,7 +289,7 @@ export function BookmarksWidget() {
                 </>
               ) : (
                 <>
-                  Show all {bookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
+                  Show all {allBookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
                 </>
               )}
             </button>

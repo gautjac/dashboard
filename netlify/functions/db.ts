@@ -108,12 +108,42 @@ export async function initializeSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      key_hash TEXT NOT NULL UNIQUE,
+      name TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      last_used_at TIMESTAMP WITH TIME ZONE
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS extension_bookmarks (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      tweet_id TEXT NOT NULL,
+      tweet_url TEXT NOT NULL,
+      author_handle TEXT,
+      author_name TEXT,
+      tweet_text TEXT,
+      media_urls TEXT[],
+      bookmarked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(user_id, tweet_id)
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_completions_habit ON habit_completions(habit_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_completions_user_date ON habit_completions(user_id, date)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_journal_user_date ON journal_entries(user_id, date)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_focus_user_date ON focus_lines(user_id, date)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_api_keys_user ON api_keys(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bookmarks_user ON extension_bookmarks(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_bookmarks_user_date ON extension_bookmarks(user_id, bookmarked_at DESC)`;
 
   return { success: true };
 }

@@ -182,6 +182,25 @@ export interface Bookmark {
   author: string;
   url: string;
   savedAt: string;
+  source?: 'readwise' | 'extension';
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface ExtensionBookmark {
+  id: string;
+  tweet_id: string;
+  tweet_url: string;
+  author_handle: string;
+  author_name: string;
+  tweet_text: string;
+  media_urls: string[];
+  bookmarked_at: string;
 }
 
 // Weekly Reflection (AI-generated)

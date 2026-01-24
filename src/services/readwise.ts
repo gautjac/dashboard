@@ -167,12 +167,17 @@ class ReadwiseService {
           // Each "book" with category tweets is actually a tweet
           // The highlights within it are the tweet text
           for (const highlight of book.highlights) {
+            // Ensure we have a valid date - empty strings are falsy but would fail Date parsing
+            const savedAt = (highlight.highlighted_at && highlight.highlighted_at.trim())
+              || (book.updated && book.updated.trim())
+              || new Date().toISOString();
+
             bookmarks.push({
               id: String(highlight.id),
               text: highlight.text || '',
               author: this.extractAuthor(book.author || '', book.title || ''),
               url: book.source_url || highlight.url || '',
-              savedAt: highlight.highlighted_at || book.updated || new Date().toISOString(),
+              savedAt,
             });
           }
         }

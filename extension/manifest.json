@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Daily Dashboard - X Bookmarks",
+  "version": "1.0.0",
+  "description": "Sync your X/Twitter bookmarks to Daily Dashboard in real-time",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://dashboard-jac.netlify.app/*",
+    "http://localhost:5173/*",
+    "http://localhost:5174/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

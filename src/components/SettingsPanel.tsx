@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   Settings,
@@ -20,12 +20,15 @@ import {
   ChevronDown,
   Bookmark,
   Twitter,
+  Puzzle,
+  Key,
+  Copy,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
 import { useReadwiseBookmarks } from '../hooks/useReadwiseBookmarks';
-import type { JournalPromptStyleType } from '../types';
+import type { JournalPromptStyleType, ApiKey } from '../types';
 
 type SettingsTab = 'general' | 'calendar' | 'bookmarks' | 'ai' | 'interests' | 'sync' | 'privacy';
 
@@ -65,6 +68,12 @@ export function SettingsPanel() {
   const [readwiseTokenInput, setReadwiseTokenInput] = useState('');
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearConfirmText, setClearConfirmText] = useState('');
+
+  // API Key state
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
 
   const {
     isConfigured,
@@ -221,7 +230,9 @@ export function SettingsPanel() {
       for (const bookmark of bookmarks) {
         markdown += `### @${bookmark.author}\n\n`;
         markdown += `${bookmark.text}\n\n`;
-        markdown += `[View on X](${bookmark.url}) | Saved: ${new Date(bookmark.savedAt).toLocaleDateString()}\n\n`;
+        const savedDate = new Date(bookmark.savedAt);
+        const savedDateStr = isNaN(savedDate.getTime()) ? 'Unknown' : savedDate.toLocaleDateString();
+        markdown += `[View on X](${bookmark.url}) | Saved: ${savedDateStr}\n\n`;
         markdown += `---\n\n`;
       }
     }
@@ -256,6 +267,65 @@ export function SettingsPanel() {
     setClearConfirmText('');
     setSettingsOpen(false);
   };
+
+  // Fetch API keys on mount
+  const fetchApiKeys = async () => {
+    try {
+      const response = await fetch('/.netlify/functions/api-keys');
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeys(data.keys || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch API keys:', error);
+    }
+  };
+
+  // Generate new API key
+  const handleGenerateApiKey = async () => {
+    setIsGeneratingKey(true);
+    try {
+      const response = await fetch('/.netlify/functions/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Browser Extension' }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNewApiKey(data.key);
+        fetchApiKeys(); // Refresh the list
+      } else {
+        console.error('Failed to generate API key');
+      }
+    } catch (error) {
+      console.error('Failed to generate API key:', error);
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
+
+  // Revoke API key
+  const handleRevokeApiKey = async (keyId: string) => {
+    try {
+      const response = await fetch(`/.netlify/functions/api-keys?id=${keyId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setApiKeys(apiKeys.filter(k => k.id !== keyId));
+      }
+    } catch (error) {
+      console.error('Failed to revoke API key:', error);
+    }
+  };
+
+  // Fetch API keys when bookmarks tab is active
+  useEffect(() => {
+    if (activeTab === 'bookmarks') {
+      fetchApiKeys();
+    }
+  }, [activeTab]);
 
   return (
     <motion.div
@@ -863,6 +933,128 @@ export function SettingsPanel() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Browser Extension Section */}
+                <div className="pt-6 border-t border-warm-gray/50">
+                  <label className="font-ui text-sm font-medium text-ink block mb-3">
+                    Browser Extension (Real-time sync)
+                  </label>
+
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg border border-warm-gray-dark bg-parchment">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-terracotta/10 flex items-center justify-center">
+                          <Puzzle className="w-5 h-5 text-terracotta" />
+                        </div>
+                        <div>
+                          <p className="font-ui text-sm font-medium text-ink">
+                            Chrome Extension
+                          </p>
+                          <p className="font-ui text-xs text-ink-muted">
+                            Instant sync when you bookmark on X
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* API Key Management */}
+                      {!newApiKey ? (
+                        <div className="space-y-3">
+                          {apiKeys.length > 0 && (
+                            <div className="space-y-2">
+                              <p className="font-ui text-xs text-ink-muted">Active API keys:</p>
+                              {apiKeys.map((key) => (
+                                <div
+                                  key={key.id}
+                                  className="flex items-center justify-between p-2 rounded-lg bg-warm-gray/30"
+                                >
+                                  <div>
+                                    <p className="font-ui text-sm text-ink">{key.name}</p>
+                                    <p className="font-ui text-xs text-ink-muted">
+                                      {key.last_used_at
+                                        ? `Last used ${new Date(key.last_used_at).toLocaleDateString()}`
+                                        : 'Never used'}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => handleRevokeApiKey(key.id)}
+                                    className="btn-ghost p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50"
+                                    title="Revoke key"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <button
+                            onClick={handleGenerateApiKey}
+                            disabled={isGeneratingKey}
+                            className="btn btn-secondary text-sm w-full"
+                          >
+                            {isGeneratingKey ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Key className="w-4 h-4" />
+                                Generate API Key
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 rounded-lg bg-sage-light/30 border border-sage/20">
+                            <p className="font-ui text-xs text-sage-dark font-medium mb-2">
+                              Your API Key (save this - it won't be shown again):
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 font-mono text-xs bg-white p-2 rounded border border-sage/30 break-all">
+                                {newApiKey}
+                              </code>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(newApiKey);
+                                  setCopiedKey(true);
+                                  setTimeout(() => setCopiedKey(false), 2000);
+                                }}
+                                className="btn-ghost p-2 rounded-lg text-sage-dark hover:bg-sage-light/50"
+                                title="Copy to clipboard"
+                              >
+                                {copiedKey ? (
+                                  <Check className="w-4 h-4" />
+                                ) : (
+                                  <Copy className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setNewApiKey(null)}
+                            className="btn btn-secondary text-sm w-full"
+                          >
+                            Done
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-warm-gray/30">
+                      <p className="font-ui text-xs text-ink-muted mb-2">
+                        <strong>Setup instructions:</strong>
+                      </p>
+                      <ol className="font-ui text-xs text-ink-muted list-decimal list-inside space-y-1">
+                        <li>Generate an API key above</li>
+                        <li>Install the Chrome extension (coming soon)</li>
+                        <li>Paste your API key in the extension settings</li>
+                        <li>Bookmarks will sync instantly when you use X</li>
+                      </ol>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
