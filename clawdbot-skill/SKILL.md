@@ -1,6 +1,6 @@
 ---
 name: daily-dashboard
-description: Interact with your Daily Dashboard - manage todos, habits, and journal entries
+description: Manage todos, habits, and journal entries on your Daily Dashboard via HTTP API
 homepage: https://dashboard-jac.netlify.app
 user-invocable: true
 metadata: {"clawdbot":{"requires":{"env":["DASHBOARD_USER_ID","DASHBOARD_USER_EMAIL"]}}}
@@ -8,237 +8,104 @@ metadata: {"clawdbot":{"requires":{"env":["DASHBOARD_USER_ID","DASHBOARD_USER_EM
 
 # Daily Dashboard Skill
 
-Interact with your personal Daily Dashboard to manage todos, track habits, and write journal entries.
+Use the `exec` tool to run curl commands against the Daily Dashboard API.
 
-## Configuration
+## Required Environment Variables
 
-Required env vars on the Gateway host:
-- DASHBOARD_USER_ID
-- DASHBOARD_USER_EMAIL
+- `DASHBOARD_USER_ID` - Your user ID (usually your email)
+- `DASHBOARD_USER_EMAIL` - Your email address
 
-## Helper
+## API Base URL
 
-All commands below use URL-encoded email to avoid broken URLs with special characters:
+`https://dashboard-jac.netlify.app/.netlify/functions`
 
-```bash
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
+## Tool Usage Pattern
+
+Always use the `exec` tool to run these curl commands. Example:
+
+```json
+{"tool": "exec", "command": "curl -sS --max-time 10 'https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=jac@jacgautreau.com&email=jac%40jacgautreau.com'"}
 ```
 
-## Todos
+## Commands
 
-### List all todos
+### List Todos
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
+When the user asks "show my todos", "what's on my list", or similar:
 
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}"
+```
+exec: curl -sS --max-time 10 "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}"
 ```
 
-### Add a new todo (robust)
+### Add a Todo
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Notes:
-# - dueDate is optional (YYYY-MM-DD)
-# - This command times out quickly and prints HTTP status for easier debugging.
+When the user asks "add a task", "remind me to", or similar:
 
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"title":"Buy groceries","dueDate":"2026-01-25"}'
+```
+exec: curl -sS --max-time 10 -X POST -H "Content-Type: application/json" -d '{"title":"TASK_TITLE","dueDate":"YYYY-MM-DD"}' "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}"
 ```
 
-### Complete/uncomplete a todo
+Replace `TASK_TITLE` with the task description and `YYYY-MM-DD` with the due date (optional).
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Replace TODO_ID with the actual todo ID
+### Complete a Todo
 
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
+When the user asks "mark X as done", "complete X":
 
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}&id=TODO_ID" \
-  -X PUT \
-  -H "Content-Type: application/json" \
-  -d '{"completed":true}'
+First list todos to get the ID, then:
+
+```
+exec: curl -sS --max-time 10 -X PUT -H "Content-Type: application/json" -d '{"completed":true}' "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}&id=TODO_ID"
 ```
 
-### Delete a todo
+### Delete a Todo
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Replace TODO_ID with the actual todo ID
-
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}&id=TODO_ID" \
-  -X DELETE
+```
+exec: curl -sS --max-time 10 -X DELETE "https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}&id=TODO_ID"
 ```
 
-## Habits
+### Get Journal Entry
 
-### List all habits
+When the user asks "what did I journal", "show my journal":
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/habits?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}"
+```
+exec: curl -sS --max-time 10 "https://dashboard-jac.netlify.app/.netlify/functions/journal?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}&date=YYYY-MM-DD"
 ```
 
-### Toggle habit completion for today
+### Write Journal Entry
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Replace HABIT_ID with the actual habit ID
-# Replace DATE with YYYY-MM-DD format
+When the user asks "write in my journal", "add journal entry":
 
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/habit-completions?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"habitId":"HABIT_ID","date":"2026-01-24"}'
+```
+exec: curl -sS --max-time 10 -X POST -H "Content-Type: application/json" -d '{"date":"YYYY-MM-DD","content":"JOURNAL_CONTENT","mood":4,"energy":4}' "https://dashboard-jac.netlify.app/.netlify/functions/journal?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}"
 ```
 
-## Journal
+### Get Focus Line
 
-### Get today's journal entry
+When the user asks "what's my focus":
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Replace DATE with YYYY-MM-DD format
-
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/journal?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}&date=2026-01-24"
+```
+exec: curl -sS --max-time 10 "https://dashboard-jac.netlify.app/.netlify/functions/focus-lines?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}&date=YYYY-MM-DD"
 ```
 
-### Create or update journal entry
+### Set Focus Line
 
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Notes:
-# - mood and energy are optional integers from 1-5
+When the user asks "set my focus to":
 
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/journal?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"date":"2026-01-24","content":"Today was productive...","mood":4,"energy":3}'
 ```
-
-## Focus Line
-
-### Get today's focus line
-
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-#
-# Replace DATE with YYYY-MM-DD format
-
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/focus-lines?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}&date=2026-01-24"
+exec: curl -sS --max-time 10 -X POST -H "Content-Type: application/json" -d '{"date":"YYYY-MM-DD","content":"FOCUS_TEXT"}' "https://dashboard-jac.netlify.app/.netlify/functions/focus-lines?userId=${DASHBOARD_USER_ID}&email=${DASHBOARD_USER_EMAIL}"
 ```
-
-### Set today's focus line
-
-```bash
-# Required env vars on the Gateway host:
-#   DASHBOARD_USER_ID
-#   DASHBOARD_USER_EMAIL
-
-EMAIL_ENC="$(python3 -c 'import os,urllib.parse; print(urllib.parse.quote(os.environ["DASHBOARD_USER_EMAIL"]))')"
-
-curl --connect-timeout 5 --max-time 20 \
-  --fail-with-body -sS \
-  -w "\nHTTP %{http_code}\n" \
-  "https://dashboard-jac.netlify.app/.netlify/functions/focus-lines?userId=${DASHBOARD_USER_ID}&email=${EMAIL_ENC}" \
-  -X POST \
-  -H "Content-Type: application/json" \
-  -d '{"date":"2026-01-24","content":"Ship the new feature"}'
-```
-
-## Common Interactions
-
-When the user asks to:
-
-- **"Add a task"** or **"Remind me to..."** -> Use the todos POST endpoint
-- **"What's on my list?"** or **"Show my todos"** -> Use the todos GET endpoint
-- **"Mark X as done"** -> Use the todos PUT endpoint with `completed: true`
-- **"Did I do my habits?"** -> Use the habits GET endpoint to list
-- **"Log my habit"** or **"I did X"** -> Use the habit-completions POST endpoint
-- **"Journal entry"** or **"Write in my journal"** -> Use the journal POST endpoint
-- **"What's my focus?"** -> Use the focus-lines GET endpoint
-- **"Set my focus to..."** -> Use the focus-lines POST endpoint
 
 ## Response Format
 
-All endpoints return JSON. Successful responses typically include the data directly or wrapped in a descriptive key (e.g., `{"todos": [...]}`, `{"habits": [...]}`).
+All endpoints return JSON:
+- Success: `{"todos":[...]}` or `{"id":"...","title":"..."}`
+- Error: `{"error":"Error message"}`
 
-Errors return: `{"error": "Error message"}`
+## Example Interaction
 
-HTTP status codes:
-- 200: Success
-- 201: Created
-- 400: Bad request
-- 401: Unauthorized (check env vars)
-- 404: Not found
-- 500: Server error
+User: "Add a task to call mom tomorrow"
+
+Agent action:
+```json
+{"tool": "exec", "command": "curl -sS --max-time 10 -X POST -H 'Content-Type: application/json' -d '{\"title\":\"Call mom\",\"dueDate\":\"2026-01-25\"}' 'https://dashboard-jac.netlify.app/.netlify/functions/todos?userId=jac@jacgautreau.com&email=jac%40jacgautreau.com'"}
+```
