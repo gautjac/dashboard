@@ -1,51 +1,54 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Bookmark as BookmarkIcon,
+  Link2,
   ExternalLink,
   RefreshCw,
   Settings2,
   AlertCircle,
-  Twitter,
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  Puzzle,
+  Sparkles,
   Trash2,
+  Loader2,
   Archive,
   RotateCcw,
   X,
   Search,
-  Sparkles,
-  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useExtensionBookmarks } from '../hooks/useExtensionBookmarks';
+import { useLinks } from '../hooks/useLinks';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import { useDashboardStore } from '../store';
 import { useTheme } from '../hooks/useTheme';
 import { formatDistanceToNow } from 'date-fns';
-import type { Bookmark } from '../types';
+import type { Link } from '../types';
 
-interface BookmarkItemProps {
-  bookmark: Bookmark & { archivedAt?: string; summary?: string };
+interface LinkItemProps {
+  link: Link;
   index: number;
+  onSummarize?: () => void;
   onDelete: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
-  onSummarize?: () => void;
   isSummarizing?: boolean;
   isArchived?: boolean;
 }
 
-function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSummarize, isSummarizing, isArchived }: BookmarkItemProps) {
+// Extract domain from URL for display
+function getDomain(url: string): string {
+  try {
+    const domain = new URL(url).hostname;
+    return domain.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+function LinkItem({ link, index, onSummarize, onDelete, onArchive, onRestore, isSummarizing, isArchived }: LinkItemProps) {
   const [expanded, setExpanded] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const isLongText = bookmark.text.length > 180;
-  const displayText = expanded || !isLongText
-    ? bookmark.text
-    : bookmark.text.slice(0, 180) + '...';
-  const hasSummary = bookmark.summary && bookmark.summary !== 'Unable to generate summary';
+  const hasSummary = link.summary && link.summary !== 'Unable to generate summary';
 
   return (
     <motion.div
@@ -56,21 +59,21 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
       className="group p-3 rounded-lg hover:bg-warm-gray/30 transition-colors"
     >
       <div className="flex items-start gap-3">
-        {/* Twitter icon */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
-          <Twitter className="w-4 h-4 text-[#1DA1F2]" />
+        {/* Link icon */}
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+          <Link2 className="w-4 h-4 text-purple-600" />
         </div>
 
         <div className="flex-1 min-w-0">
-          {/* Author */}
+          {/* Title or URL */}
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-ui text-sm font-medium text-ink">
-              {bookmark.author}
+            <span className="font-ui text-sm font-medium text-ink truncate">
+              {link.title || getDomain(link.url)}
             </span>
-            <span className="font-ui text-xs text-ink-muted">
+            <span className="font-ui text-xs text-ink-muted flex-shrink-0">
               {(() => {
                 try {
-                  const date = new Date(isArchived && bookmark.archivedAt ? bookmark.archivedAt : bookmark.savedAt);
+                  const date = new Date(isArchived && link.archivedAt ? link.archivedAt : link.savedAt);
                   if (isNaN(date.getTime())) return 'recently';
                   return formatDistanceToNow(date, { addSuffix: true });
                 } catch {
@@ -80,59 +83,47 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
             </span>
           </div>
 
-          {/* Tweet text */}
-          <p className="font-body text-sm text-ink-light leading-relaxed">
-            {displayText}
-          </p>
-
-          {/* Expand button for long texts */}
-          {isLongText && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="mt-1 font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1"
-            >
-              {expanded ? (
-                <>
-                  Show less <ChevronUp className="w-3 h-3" />
-                </>
-              ) : (
-                <>
-                  Show more <ChevronDown className="w-3 h-3" />
-                </>
-              )}
-            </button>
+          {/* Domain */}
+          {link.title && (
+            <p className="font-ui text-xs text-ink-muted mb-1 truncate">
+              {getDomain(link.url)}
+            </p>
           )}
 
-          {/* AI Summary */}
+          {/* Summary */}
           {hasSummary && (
-            <div className="mt-2">
-              <button
-                onClick={() => setShowSummary(!showSummary)}
-                className="inline-flex items-center gap-1.5 font-ui text-xs text-terracotta hover:text-terracotta-dark transition-colors"
-              >
-                <Sparkles className="w-3 h-3" />
-                {showSummary ? 'Hide summary' : 'View AI summary'}
-                {showSummary ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-              {showSummary && (
-                <div className="mt-2 p-3 rounded-lg bg-terracotta-light/20 border border-terracotta/20">
-                  <p className="font-body text-sm text-ink leading-relaxed whitespace-pre-wrap">
-                    {bookmark.summary}
-                  </p>
-                </div>
+            <>
+              <p className="font-body text-sm text-ink-light leading-relaxed">
+                {expanded ? link.summary : link.summary!.slice(0, 150) + (link.summary!.length > 150 ? '...' : '')}
+              </p>
+              {link.summary!.length > 150 && (
+                <button
+                  onClick={() => setExpanded(!expanded)}
+                  className="mt-1 font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1"
+                >
+                  {expanded ? (
+                    <>
+                      Show less <ChevronUp className="w-3 h-3" />
+                    </>
+                  ) : (
+                    <>
+                      Show more <ChevronDown className="w-3 h-3" />
+                    </>
+                  )}
+                </button>
               )}
-            </div>
+            </>
           )}
 
           {/* Actions */}
           <div className="mt-2 flex items-center gap-3">
             <a
-              href={bookmark.url}
+              href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-ui text-xs text-[#1DA1F2] hover:text-[#1a8cd8] transition-colors"
+              className="inline-flex items-center gap-1.5 font-ui text-xs text-purple-600 hover:text-purple-700 transition-colors"
             >
-              View on X
+              Open link
               <ExternalLink className="w-3 h-3" />
             </a>
 
@@ -145,7 +136,7 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
                 {isSummarizing ? (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Analyzing...
+                    Summarizing...
                   </>
                 ) : (
                   <>
@@ -191,13 +182,13 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
 interface ArchivePanelProps {
   isOpen: boolean;
   onClose: () => void;
-  bookmarks: (Bookmark & { archivedAt?: string })[];
+  links: Link[];
   isLoading: boolean;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDelete }: ArchivePanelProps) {
+function ArchivePanel({ isOpen, onClose, links, isLoading, onRestore, onDelete }: ArchivePanelProps) {
   const { isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -220,17 +211,17 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
     inputBg: '#FFFFFF',
   };
 
-  // Filter bookmarks based on search query
-  const filteredBookmarks = searchQuery.trim()
-    ? bookmarks.filter(bookmark => {
+  // Filter links based on search query
+  const filteredLinks = searchQuery.trim()
+    ? links.filter(link => {
         const query = searchQuery.toLowerCase();
         return (
-          bookmark.author.toLowerCase().includes(query) ||
-          bookmark.text.toLowerCase().includes(query) ||
-          bookmark.url.toLowerCase().includes(query)
+          (link.title && link.title.toLowerCase().includes(query)) ||
+          link.url.toLowerCase().includes(query) ||
+          (link.summary && link.summary.toLowerCase().includes(query))
         );
       })
-    : bookmarks;
+    : links;
 
   const modalContent = (
     <div
@@ -291,7 +282,7 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   margin: 0,
                 }}
               >
-                Archived Bookmarks
+                Archived Links
               </h3>
             </div>
             <button
@@ -325,7 +316,7 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search archived bookmarks..."
+              placeholder="Search archived links..."
               style={{
                 width: '100%',
                 padding: '8px 12px 8px 36px',
@@ -362,10 +353,10 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                Loading archived bookmarks...
+                Loading archived links...
               </p>
             </div>
-          ) : bookmarks.length === 0 ? (
+          ) : links.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <Archive
                 style={{
@@ -382,10 +373,10 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                No archived bookmarks
+                No archived links
               </p>
             </div>
-          ) : filteredBookmarks.length === 0 ? (
+          ) : filteredLinks.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <Search
                 style={{
@@ -402,20 +393,20 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                No bookmarks match "{searchQuery}"
+                No links match "{searchQuery}"
               </p>
             </div>
           ) : (
             <div style={{ padding: 8 }}>
               <AnimatePresence>
-                {filteredBookmarks.map((bookmark, index) => (
-                  <BookmarkItem
-                    key={bookmark.id}
-                    bookmark={bookmark}
+                {filteredLinks.map((link, index) => (
+                  <LinkItem
+                    key={link.id}
+                    link={link}
                     index={index}
                     isArchived
-                    onRestore={() => onRestore(bookmark.id)}
-                    onDelete={() => onDelete(bookmark.id)}
+                    onRestore={() => onRestore(link.id)}
+                    onDelete={() => onDelete(link.id)}
                   />
                 ))}
               </AnimatePresence>
@@ -429,41 +420,41 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
   return createPortal(modalContent, document.body);
 }
 
-export function BookmarksWidget() {
+export function LinksWidget() {
   const { setSettingsOpen } = useDashboardStore();
   const {
-    bookmarks,
-    archivedBookmarks,
+    links,
+    archivedLinks,
     isLoading,
     isLoadingArchived,
     error,
-    refreshBookmarks,
-    fetchArchivedBookmarks,
-    deleteBookmark,
-    archiveBookmark,
-    restoreBookmark,
-    summarizeBookmark,
+    refreshLinks,
+    fetchArchivedLinks,
+    deleteLink,
+    archiveLink,
+    restoreLink,
+    summarizeLink,
     summarizingId,
     total,
-  } = useExtensionBookmarks();
+  } = useLinks();
 
   const [showAll, setShowAll] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('bookmarks');
+  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('links');
 
-  const displayedBookmarks = showAll ? bookmarks : bookmarks.slice(0, 5);
-  const hasBookmarks = bookmarks.length > 0 || total > 0;
+  const displayedLinks = showAll ? links : links.slice(0, 5);
+  const hasLinks = links.length > 0 || total > 0;
 
   const handleOpenArchive = () => {
     setShowArchive(true);
-    fetchArchivedBookmarks();
+    fetchArchivedLinks();
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.4 }}
+      transition={{ delay: 0.35, duration: 0.4 }}
       className="card p-5"
     >
       {/* Header */}
@@ -478,13 +469,13 @@ export function BookmarksWidget() {
           >
             <ChevronRight className="w-5 h-5 text-ink-muted" />
           </motion.div>
-          <BookmarkIcon className="w-5 h-5 text-ink-muted" />
+          <Link2 className="w-5 h-5 text-ink-muted" />
           <h3 className="font-display text-xl font-semibold text-ink">
-            X Bookmarks
+            Links
           </h3>
-          {isCollapsed && bookmarks.length > 0 && (
+          {isCollapsed && links.length > 0 && (
             <span className="font-ui text-sm text-ink-muted">
-              ({bookmarks.length})
+              ({links.length})
             </span>
           )}
         </button>
@@ -496,11 +487,11 @@ export function BookmarksWidget() {
           >
             <Archive className="w-4 h-4" />
           </button>
-          {hasBookmarks && (
+          {hasLinks && (
             <button
               className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
-              title="Refresh bookmarks"
-              onClick={refreshBookmarks}
+              title="Refresh links"
+              onClick={refreshLinks}
               disabled={isLoading}
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -508,7 +499,7 @@ export function BookmarksWidget() {
           )}
           <button
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
-            title="Configure extension"
+            title="Configure API key"
             onClick={() => setSettingsOpen(true)}
           >
             <Settings2 className="w-4 h-4" />
@@ -536,57 +527,57 @@ export function BookmarksWidget() {
               </div>
             )}
 
-            {isLoading && bookmarks.length === 0 ? (
+            {isLoading && links.length === 0 ? (
               // Loading state
               <div className="py-8 text-center">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center animate-pulse">
-                  <RefreshCw className="w-6 h-6 text-[#1DA1F2] animate-spin" />
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center animate-pulse">
+                  <RefreshCw className="w-6 h-6 text-purple-600 animate-spin" />
                 </div>
                 <p className="font-ui text-sm text-ink-muted">
-                  Loading your bookmarks...
+                  Loading your links...
                 </p>
               </div>
-            ) : bookmarks.length === 0 ? (
-              // Empty state - prompt to set up extension
+            ) : links.length === 0 ? (
+              // Empty state
               <div className="py-8 text-center">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-terracotta/10 flex items-center justify-center">
-                  <Puzzle className="w-6 h-6 text-terracotta" />
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Link2 className="w-6 h-6 text-purple-600" />
                 </div>
                 <p className="font-display text-lg text-ink">
-                  Set up the browser extension
+                  No saved links yet
                 </p>
                 <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-                  Sync your X bookmarks in real-time
+                  Share links from Safari using your API key
                 </p>
                 <button
                   className="btn btn-secondary text-sm"
                   onClick={() => setSettingsOpen(true)}
                 >
                   <Settings2 className="w-4 h-4" />
-                  Get Started
+                  Set up shortcuts
                 </button>
               </div>
             ) : (
               <>
-                {/* Bookmarks list */}
+                {/* Links list */}
                 <div className="space-y-1">
                   <AnimatePresence>
-                    {displayedBookmarks.map((bookmark, index) => (
-                      <BookmarkItem
-                        key={bookmark.id}
-                        bookmark={bookmark}
+                    {displayedLinks.map((link, index) => (
+                      <LinkItem
+                        key={link.id}
+                        link={link}
                         index={index}
-                        onArchive={() => archiveBookmark(bookmark.id)}
-                        onDelete={() => deleteBookmark(bookmark.id)}
-                        onSummarize={() => summarizeBookmark(bookmark.id)}
-                        isSummarizing={summarizingId === bookmark.id}
+                        onSummarize={() => summarizeLink(link.id)}
+                        onArchive={() => archiveLink(link.id)}
+                        onDelete={() => deleteLink(link.id)}
+                        isSummarizing={summarizingId === link.id}
                       />
                     ))}
                   </AnimatePresence>
                 </div>
 
                 {/* Show more / less */}
-                {bookmarks.length > 5 && (
+                {links.length > 5 && (
                   <button
                     onClick={() => setShowAll(!showAll)}
                     className="mt-4 w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
@@ -597,7 +588,7 @@ export function BookmarksWidget() {
                       </>
                     ) : (
                       <>
-                        Show all {bookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
+                        Show all {links.length} links <ChevronDown className="w-4 h-4" />
                       </>
                     )}
                   </button>
@@ -614,10 +605,10 @@ export function BookmarksWidget() {
           <ArchivePanel
             isOpen={showArchive}
             onClose={() => setShowArchive(false)}
-            bookmarks={archivedBookmarks as any}
+            links={archivedLinks}
             isLoading={isLoadingArchived}
-            onRestore={restoreBookmark}
-            onDelete={deleteBookmark}
+            onRestore={restoreLink}
+            onDelete={deleteLink}
           />
         )}
       </AnimatePresence>

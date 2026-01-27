@@ -7,6 +7,7 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Sparkles,
   BookOpen,
   Dumbbell,
@@ -14,11 +15,14 @@ import {
   Moon,
   Brain,
   CalendarDays,
+  Settings2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
+import { useCollapsedState } from '../hooks/useCollapsedState';
 import { HabitHistoryModal } from './HabitHistoryModal';
 import { AddHabitModal } from './AddHabitModal';
+import { EditHabitModal } from './EditHabitModal';
 import type { HabitWithStats } from '../types';
 
 // Icon mapping
@@ -35,9 +39,10 @@ interface HabitItemProps {
   habit: HabitWithStats;
   onToggle: () => void;
   onSetValue?: (value: number) => void;
+  onEdit: () => void;
 }
 
-function HabitItem({ habit, onToggle, onSetValue }: HabitItemProps) {
+function HabitItem({ habit, onToggle, onSetValue, onEdit }: HabitItemProps) {
   const [showDetails, setShowDetails] = useState(false);
   const [inputValue, setInputValue] = useState(
     habit.todayValue?.toString() || ''
@@ -247,6 +252,15 @@ function HabitItem({ habit, onToggle, onSetValue }: HabitItemProps) {
                     ))}
                   </div>
                 )}
+
+                {/* Edit button */}
+                <button
+                  onClick={onEdit}
+                  className="mt-3 flex items-center gap-1.5 font-ui text-xs text-ink-muted hover:text-ink transition-colors"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  Edit habit
+                </button>
               </div>
             </div>
           </motion.div>
@@ -265,6 +279,8 @@ export function HabitsWidget() {
 
   const [showHistory, setShowHistory] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<HabitWithStats | null>(null);
+  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('habits');
 
   const habitsWithStats = getHabitsWithStats();
   const completedCount = habitsWithStats.filter((h) => h.todayCompleted).length;
@@ -279,13 +295,27 @@ export function HabitsWidget() {
       className="card p-5"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-between ${!isCollapsed ? 'mb-4' : ''}`}>
+        <button
+          onClick={toggleCollapsed}
+          className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+        >
+          <motion.div
+            animate={{ rotate: isCollapsed ? 0 : 90 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronRight className="w-5 h-5 text-ink-muted" />
+          </motion.div>
           <CheckCircle2 className="w-5 h-5 text-ink-muted" />
           <h3 className="font-display text-xl font-semibold text-ink">
             Today's Habits
           </h3>
-        </div>
+          {isCollapsed && habitsWithStats.length > 0 && (
+            <span className="font-ui text-sm text-ink-muted">
+              ({completedCount}/{totalCount})
+            </span>
+          )}
+        </button>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setShowHistory(true)}
@@ -304,73 +334,87 @@ export function HabitsWidget() {
         </div>
       </div>
 
-      {/* Progress overview */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-ui text-sm text-ink-muted">
-            {completedCount} of {totalCount} completed
-          </span>
-          <span className="font-ui text-sm font-medium text-ink">
-            {Math.round(progress)}%
-          </span>
-        </div>
-        <div className="progress-bar h-2">
+      {/* Collapsible content */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
           <motion.div
-            className="progress-bar-fill h-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-          />
-        </div>
-      </div>
-
-      {/* Habits list */}
-      {habitsWithStats.length === 0 ? (
-        <div className="py-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
-            <CheckCircle2 className="w-6 h-6 text-ink-muted" />
-          </div>
-          <p className="font-ui text-sm text-ink-muted mb-4">
-            Start building positive routines
-          </p>
-          <button
-            onClick={() => setShowAddHabit(true)}
-            className="btn btn-secondary text-sm"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
           >
-            <Plus className="w-4 h-4" />
-            Add your first habit
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {habitsWithStats.map((habit) => (
-            <HabitItem
-              key={habit.id}
-              habit={habit}
-              onToggle={() => toggleHabitCompletion(habit.id)}
-              onSetValue={
-                habit.targetType === 'numeric'
-                  ? (value) => setHabitValue(habit.id, value)
-                  : undefined
-              }
-            />
-          ))}
-        </div>
-      )}
+            {/* Progress overview */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-ui text-sm text-ink-muted">
+                  {completedCount} of {totalCount} completed
+                </span>
+                <span className="font-ui text-sm font-medium text-ink">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <div className="progress-bar h-2">
+                <motion.div
+                  className="progress-bar-fill h-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                />
+              </div>
+            </div>
 
-      {/* Encouragement message */}
-      {completedCount === totalCount && totalCount > 0 && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mt-4 p-3 rounded-lg bg-sage-light/40 border border-sage/30 text-center"
-        >
-          <p className="font-display text-sm text-sage-dark">
-            All habits completed today! You're on fire.
-          </p>
-        </motion.div>
-      )}
+            {/* Habits list */}
+            {habitsWithStats.length === 0 ? (
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-ink-muted" />
+                </div>
+                <p className="font-ui text-sm text-ink-muted mb-4">
+                  Start building positive routines
+                </p>
+                <button
+                  onClick={() => setShowAddHabit(true)}
+                  className="btn btn-secondary text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add your first habit
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {habitsWithStats.map((habit) => (
+                  <HabitItem
+                    key={habit.id}
+                    habit={habit}
+                    onToggle={() => toggleHabitCompletion(habit.id)}
+                    onSetValue={
+                      habit.targetType === 'numeric'
+                        ? (value) => setHabitValue(habit.id, value)
+                        : undefined
+                    }
+                    onEdit={() => setEditingHabit(habit)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Encouragement message */}
+            {completedCount === totalCount && totalCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                className="mt-4 p-3 rounded-lg bg-sage-light/40 border border-sage/30 text-center"
+              >
+                <p className="font-display text-sm text-sage-dark">
+                  All habits completed today! You're on fire.
+                </p>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* History Modal */}
       <AnimatePresence>
@@ -380,6 +424,16 @@ export function HabitsWidget() {
       {/* Add Habit Modal */}
       <AnimatePresence>
         {showAddHabit && <AddHabitModal onClose={() => setShowAddHabit(false)} />}
+      </AnimatePresence>
+
+      {/* Edit Habit Modal */}
+      <AnimatePresence>
+        {editingHabit && (
+          <EditHabitModal
+            habit={editingHabit}
+            onClose={() => setEditingHabit(null)}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );

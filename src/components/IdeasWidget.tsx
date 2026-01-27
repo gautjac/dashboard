@@ -1,52 +1,41 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Bookmark as BookmarkIcon,
-  ExternalLink,
+  Lightbulb,
   RefreshCw,
   Settings2,
   AlertCircle,
-  Twitter,
   ChevronDown,
   ChevronUp,
   ChevronRight,
-  Puzzle,
   Trash2,
   Archive,
   RotateCcw,
   X,
+  Plus,
+  Pencil,
+  AlertTriangle,
   Search,
-  Sparkles,
-  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useExtensionBookmarks } from '../hooks/useExtensionBookmarks';
+import { useIdeas } from '../hooks/useIdeas';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import { useDashboardStore } from '../store';
 import { useTheme } from '../hooks/useTheme';
 import { formatDistanceToNow } from 'date-fns';
-import type { Bookmark } from '../types';
+import type { Idea } from '../types';
 
-interface BookmarkItemProps {
-  bookmark: Bookmark & { archivedAt?: string; summary?: string };
+interface IdeaItemProps {
+  idea: Idea;
   index: number;
   onDelete: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
-  onSummarize?: () => void;
-  isSummarizing?: boolean;
+  onEdit?: () => void;
   isArchived?: boolean;
 }
 
-function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSummarize, isSummarizing, isArchived }: BookmarkItemProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [showSummary, setShowSummary] = useState(false);
-  const isLongText = bookmark.text.length > 180;
-  const displayText = expanded || !isLongText
-    ? bookmark.text
-    : bookmark.text.slice(0, 180) + '...';
-  const hasSummary = bookmark.summary && bookmark.summary !== 'Unable to generate summary';
-
+function IdeaItem({ idea, index, onDelete, onArchive, onRestore, onEdit, isArchived }: IdeaItemProps) {
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -56,21 +45,28 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
       className="group p-3 rounded-lg hover:bg-warm-gray/30 transition-colors"
     >
       <div className="flex items-start gap-3">
-        {/* Twitter icon */}
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center">
-          <Twitter className="w-4 h-4 text-[#1DA1F2]" />
+        {/* Lightbulb icon */}
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+          <Lightbulb className="w-4 h-4 text-yellow-600" />
         </div>
 
         <div className="flex-1 min-w-0">
-          {/* Author */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-ui text-sm font-medium text-ink">
-              {bookmark.author}
-            </span>
+          {/* Idea text */}
+          <p className="font-body text-sm text-ink-light leading-relaxed">
+            {idea.text}
+          </p>
+
+          {/* Category and timestamp */}
+          <div className="flex items-center gap-2 mt-1">
+            {idea.category && (
+              <span className="badge badge-neutral text-[10px]">
+                {idea.category}
+              </span>
+            )}
             <span className="font-ui text-xs text-ink-muted">
               {(() => {
                 try {
-                  const date = new Date(isArchived && bookmark.archivedAt ? bookmark.archivedAt : bookmark.savedAt);
+                  const date = new Date(isArchived && idea.archivedAt ? idea.archivedAt : idea.createdAt);
                   if (isNaN(date.getTime())) return 'recently';
                   return formatDistanceToNow(date, { addSuffix: true });
                 } catch {
@@ -80,82 +76,8 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
             </span>
           </div>
 
-          {/* Tweet text */}
-          <p className="font-body text-sm text-ink-light leading-relaxed">
-            {displayText}
-          </p>
-
-          {/* Expand button for long texts */}
-          {isLongText && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="mt-1 font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1"
-            >
-              {expanded ? (
-                <>
-                  Show less <ChevronUp className="w-3 h-3" />
-                </>
-              ) : (
-                <>
-                  Show more <ChevronDown className="w-3 h-3" />
-                </>
-              )}
-            </button>
-          )}
-
-          {/* AI Summary */}
-          {hasSummary && (
-            <div className="mt-2">
-              <button
-                onClick={() => setShowSummary(!showSummary)}
-                className="inline-flex items-center gap-1.5 font-ui text-xs text-terracotta hover:text-terracotta-dark transition-colors"
-              >
-                <Sparkles className="w-3 h-3" />
-                {showSummary ? 'Hide summary' : 'View AI summary'}
-                {showSummary ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-              </button>
-              {showSummary && (
-                <div className="mt-2 p-3 rounded-lg bg-terracotta-light/20 border border-terracotta/20">
-                  <p className="font-body text-sm text-ink leading-relaxed whitespace-pre-wrap">
-                    {bookmark.summary}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Actions */}
           <div className="mt-2 flex items-center gap-3">
-            <a
-              href={bookmark.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 font-ui text-xs text-[#1DA1F2] hover:text-[#1a8cd8] transition-colors"
-            >
-              View on X
-              <ExternalLink className="w-3 h-3" />
-            </a>
-
-            {!isArchived && !hasSummary && onSummarize && (
-              <button
-                onClick={onSummarize}
-                disabled={isSummarizing}
-                className="inline-flex items-center gap-1.5 font-ui text-xs text-terracotta hover:text-terracotta-dark transition-colors disabled:opacity-50"
-              >
-                {isSummarizing ? (
-                  <>
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3 h-3" />
-                    Get summary
-                  </>
-                )}
-              </button>
-            )}
-
             {isArchived && onRestore && (
               <button
                 onClick={onRestore}
@@ -163,6 +85,15 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
               >
                 <RotateCcw className="w-3 h-3" />
                 Restore
+              </button>
+            )}
+
+            {!isArchived && onEdit && (
+              <button
+                onClick={onEdit}
+                className="inline-flex items-center gap-1.5 font-ui text-xs text-ink-faint hover:text-ink opacity-0 group-hover:opacity-100 transition-all"
+              >
+                <Pencil className="w-3 h-3" />
               </button>
             )}
 
@@ -191,13 +122,13 @@ function BookmarkItem({ bookmark, index, onDelete, onArchive, onRestore, onSumma
 interface ArchivePanelProps {
   isOpen: boolean;
   onClose: () => void;
-  bookmarks: (Bookmark & { archivedAt?: string })[];
+  ideas: Idea[];
   isLoading: boolean;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
-function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDelete }: ArchivePanelProps) {
+function ArchivePanel({ isOpen, onClose, ideas, isLoading, onRestore, onDelete }: ArchivePanelProps) {
   const { isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -220,17 +151,16 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
     inputBg: '#FFFFFF',
   };
 
-  // Filter bookmarks based on search query
-  const filteredBookmarks = searchQuery.trim()
-    ? bookmarks.filter(bookmark => {
+  // Filter ideas based on search query
+  const filteredIdeas = searchQuery.trim()
+    ? ideas.filter(idea => {
         const query = searchQuery.toLowerCase();
         return (
-          bookmark.author.toLowerCase().includes(query) ||
-          bookmark.text.toLowerCase().includes(query) ||
-          bookmark.url.toLowerCase().includes(query)
+          idea.text.toLowerCase().includes(query) ||
+          (idea.category && idea.category.toLowerCase().includes(query))
         );
       })
-    : bookmarks;
+    : ideas;
 
   const modalContent = (
     <div
@@ -291,7 +221,7 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   margin: 0,
                 }}
               >
-                Archived Bookmarks
+                Archived Ideas
               </h3>
             </div>
             <button
@@ -325,7 +255,7 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search archived bookmarks..."
+              placeholder="Search archived ideas..."
               style={{
                 width: '100%',
                 padding: '8px 12px 8px 36px',
@@ -362,10 +292,10 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                Loading archived bookmarks...
+                Loading archived ideas...
               </p>
             </div>
-          ) : bookmarks.length === 0 ? (
+          ) : ideas.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <Archive
                 style={{
@@ -382,10 +312,10 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                No archived bookmarks
+                No archived ideas
               </p>
             </div>
-          ) : filteredBookmarks.length === 0 ? (
+          ) : filteredIdeas.length === 0 ? (
             <div style={{ padding: '48px 0', textAlign: 'center' }}>
               <Search
                 style={{
@@ -402,20 +332,20 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
                   color: colors.textMuted,
                 }}
               >
-                No bookmarks match "{searchQuery}"
+                No ideas match "{searchQuery}"
               </p>
             </div>
           ) : (
             <div style={{ padding: 8 }}>
               <AnimatePresence>
-                {filteredBookmarks.map((bookmark, index) => (
-                  <BookmarkItem
-                    key={bookmark.id}
-                    bookmark={bookmark}
+                {filteredIdeas.map((idea, index) => (
+                  <IdeaItem
+                    key={idea.id}
+                    idea={idea}
                     index={index}
                     isArchived
-                    onRestore={() => onRestore(bookmark.id)}
-                    onDelete={() => onDelete(bookmark.id)}
+                    onRestore={() => onRestore(idea.id)}
+                    onDelete={() => onDelete(idea.id)}
                   />
                 ))}
               </AnimatePresence>
@@ -429,41 +359,78 @@ function ArchivePanel({ isOpen, onClose, bookmarks, isLoading, onRestore, onDele
   return createPortal(modalContent, document.body);
 }
 
-export function BookmarksWidget() {
+export function IdeasWidget() {
   const { setSettingsOpen } = useDashboardStore();
   const {
-    bookmarks,
-    archivedBookmarks,
+    ideas,
+    archivedIdeas,
     isLoading,
     isLoadingArchived,
     error,
-    refreshBookmarks,
-    fetchArchivedBookmarks,
-    deleteBookmark,
-    archiveBookmark,
-    restoreBookmark,
-    summarizeBookmark,
-    summarizingId,
+    syncEnabled,
+    refreshIdeas,
+    fetchArchivedIdeas,
+    addIdea,
+    updateIdea,
+    deleteIdea,
+    archiveIdea,
+    restoreIdea,
     total,
-  } = useExtensionBookmarks();
+  } = useIdeas();
 
   const [showAll, setShowAll] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
-  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('bookmarks');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newIdeaText, setNewIdeaText] = useState('');
+  const [newIdeaCategory, setNewIdeaCategory] = useState('');
+  const [editingIdea, setEditingIdea] = useState<Idea | null>(null);
+  const [editText, setEditText] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('ideas');
 
-  const displayedBookmarks = showAll ? bookmarks : bookmarks.slice(0, 5);
-  const hasBookmarks = bookmarks.length > 0 || total > 0;
+  const displayedIdeas = showAll ? ideas : ideas.slice(0, 5);
+  const hasIdeas = ideas.length > 0 || total > 0;
 
   const handleOpenArchive = () => {
     setShowArchive(true);
-    fetchArchivedBookmarks();
+    fetchArchivedIdeas();
+  };
+
+  const handleAddIdea = async () => {
+    if (!newIdeaText.trim()) return;
+    try {
+      await addIdea(newIdeaText.trim(), newIdeaCategory.trim() || undefined);
+      setNewIdeaText('');
+      setNewIdeaCategory('');
+      setShowAddForm(false);
+    } catch {
+      // Error handled by hook
+    }
+  };
+
+  const handleStartEdit = (idea: Idea) => {
+    setEditingIdea(idea);
+    setEditText(idea.text);
+    setEditCategory(idea.category || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingIdea || !editText.trim()) return;
+    try {
+      await updateIdea(editingIdea.id, editText.trim(), editCategory.trim() || undefined);
+      setEditingIdea(null);
+      setEditText('');
+      setEditCategory('');
+    } catch {
+      // Error handled by hook
+    }
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3, duration: 0.4 }}
+      transition={{ delay: 0.4, duration: 0.4 }}
       className="card p-5"
     >
       {/* Header */}
@@ -478,13 +445,13 @@ export function BookmarksWidget() {
           >
             <ChevronRight className="w-5 h-5 text-ink-muted" />
           </motion.div>
-          <BookmarkIcon className="w-5 h-5 text-ink-muted" />
+          <Lightbulb className="w-5 h-5 text-ink-muted" />
           <h3 className="font-display text-xl font-semibold text-ink">
-            X Bookmarks
+            Idea Inbox
           </h3>
-          {isCollapsed && bookmarks.length > 0 && (
+          {isCollapsed && ideas.length > 0 && (
             <span className="font-ui text-sm text-ink-muted">
-              ({bookmarks.length})
+              ({ideas.length})
             </span>
           )}
         </button>
@@ -496,11 +463,18 @@ export function BookmarksWidget() {
           >
             <Archive className="w-4 h-4" />
           </button>
-          {hasBookmarks && (
+          <button
+            className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
+            title="Add idea"
+            onClick={() => setShowAddForm(!showAddForm)}
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+          {hasIdeas && (
             <button
               className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
-              title="Refresh bookmarks"
-              onClick={refreshBookmarks}
+              title="Refresh ideas"
+              onClick={refreshIdeas}
               disabled={isLoading}
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -508,7 +482,7 @@ export function BookmarksWidget() {
           )}
           <button
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
-            title="Configure extension"
+            title="Configure API key"
             onClick={() => setSettingsOpen(true)}
           >
             <Settings2 className="w-4 h-4" />
@@ -526,6 +500,18 @@ export function BookmarksWidget() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden"
           >
+            {/* Sync warning */}
+            {!syncEnabled && (
+              <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-ui text-sm text-yellow-800">
+                    Enable Sync to save ideas. <button onClick={() => setSettingsOpen(true)} className="underline">Go to Settings</button>
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Error state */}
             {error && (
               <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
@@ -536,57 +522,148 @@ export function BookmarksWidget() {
               </div>
             )}
 
-            {isLoading && bookmarks.length === 0 ? (
+            {/* Quick add form */}
+            <AnimatePresence>
+              {showAddForm && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="mb-4 overflow-hidden"
+                >
+                  <div className="p-3 rounded-lg border border-warm-gray-dark bg-parchment">
+                    <textarea
+                      value={newIdeaText}
+                      onChange={(e) => setNewIdeaText(e.target.value)}
+                      placeholder="Capture your idea..."
+                      rows={2}
+                      className="input w-full resize-none text-sm mb-2"
+                      autoFocus
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newIdeaCategory}
+                        onChange={(e) => setNewIdeaCategory(e.target.value)}
+                        placeholder="Category (optional)"
+                        className="input flex-1 text-sm"
+                      />
+                      <button
+                        onClick={handleAddIdea}
+                        disabled={!newIdeaText.trim() || !syncEnabled}
+                        className="btn btn-primary text-sm disabled:opacity-50"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAddForm(false);
+                          setNewIdeaText('');
+                          setNewIdeaCategory('');
+                        }}
+                        className="btn btn-secondary text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {isLoading && ideas.length === 0 ? (
               // Loading state
               <div className="py-8 text-center">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-[#1DA1F2]/10 flex items-center justify-center animate-pulse">
-                  <RefreshCw className="w-6 h-6 text-[#1DA1F2] animate-spin" />
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-yellow-100 flex items-center justify-center animate-pulse">
+                  <RefreshCw className="w-6 h-6 text-yellow-600 animate-spin" />
                 </div>
                 <p className="font-ui text-sm text-ink-muted">
-                  Loading your bookmarks...
+                  Loading your ideas...
                 </p>
               </div>
-            ) : bookmarks.length === 0 ? (
-              // Empty state - prompt to set up extension
+            ) : ideas.length === 0 ? (
+              // Empty state
               <div className="py-8 text-center">
-                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-terracotta/10 flex items-center justify-center">
-                  <Puzzle className="w-6 h-6 text-terracotta" />
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-yellow-100 flex items-center justify-center">
+                  <Lightbulb className="w-6 h-6 text-yellow-600" />
                 </div>
                 <p className="font-display text-lg text-ink">
-                  Set up the browser extension
+                  No ideas yet
                 </p>
                 <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-                  Sync your X bookmarks in real-time
+                  Capture ideas from anywhere with the iOS shortcut
                 </p>
                 <button
                   className="btn btn-secondary text-sm"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => setShowAddForm(true)}
                 >
-                  <Settings2 className="w-4 h-4" />
-                  Get Started
+                  <Plus className="w-4 h-4" />
+                  Add your first idea
                 </button>
               </div>
             ) : (
               <>
-                {/* Bookmarks list */}
+                {/* Ideas list */}
                 <div className="space-y-1">
                   <AnimatePresence>
-                    {displayedBookmarks.map((bookmark, index) => (
-                      <BookmarkItem
-                        key={bookmark.id}
-                        bookmark={bookmark}
-                        index={index}
-                        onArchive={() => archiveBookmark(bookmark.id)}
-                        onDelete={() => deleteBookmark(bookmark.id)}
-                        onSummarize={() => summarizeBookmark(bookmark.id)}
-                        isSummarizing={summarizingId === bookmark.id}
-                      />
+                    {displayedIdeas.map((idea, index) => (
+                      editingIdea?.id === idea.id ? (
+                        <motion.div
+                          key={idea.id}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="p-3 rounded-lg border border-warm-gray-dark bg-parchment"
+                        >
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            rows={2}
+                            className="input w-full resize-none text-sm mb-2"
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={editCategory}
+                              onChange={(e) => setEditCategory(e.target.value)}
+                              placeholder="Category (optional)"
+                              className="input flex-1 text-sm"
+                            />
+                            <button
+                              onClick={handleSaveEdit}
+                              disabled={!editText.trim()}
+                              className="btn btn-primary text-sm disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingIdea(null);
+                                setEditText('');
+                                setEditCategory('');
+                              }}
+                              className="btn btn-secondary text-sm"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <IdeaItem
+                          key={idea.id}
+                          idea={idea}
+                          index={index}
+                          onArchive={() => archiveIdea(idea.id)}
+                          onDelete={() => deleteIdea(idea.id)}
+                          onEdit={() => handleStartEdit(idea)}
+                        />
+                      )
                     ))}
                   </AnimatePresence>
                 </div>
 
                 {/* Show more / less */}
-                {bookmarks.length > 5 && (
+                {ideas.length > 5 && (
                   <button
                     onClick={() => setShowAll(!showAll)}
                     className="mt-4 w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
@@ -597,7 +674,7 @@ export function BookmarksWidget() {
                       </>
                     ) : (
                       <>
-                        Show all {bookmarks.length} bookmarks <ChevronDown className="w-4 h-4" />
+                        Show all {ideas.length} ideas <ChevronDown className="w-4 h-4" />
                       </>
                     )}
                   </button>
@@ -614,10 +691,10 @@ export function BookmarksWidget() {
           <ArchivePanel
             isOpen={showArchive}
             onClose={() => setShowArchive(false)}
-            bookmarks={archivedBookmarks as any}
+            ideas={archivedIdeas}
             isLoading={isLoadingArchived}
-            onRestore={restoreBookmark}
-            onDelete={deleteBookmark}
+            onRestore={restoreIdea}
+            onDelete={deleteIdea}
           />
         )}
       </AnimatePresence>

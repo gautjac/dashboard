@@ -387,6 +387,7 @@ export const useDashboardStore = create<DashboardStore>()(
           completed: false,
           completedAt: null,
           createdAt: new Date().toISOString(),
+          project: todo.project || null,
         };
         set(state => ({
           todos: [...state.todos, newTodo],

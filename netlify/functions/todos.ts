@@ -1,9 +1,27 @@
 import type { Context } from '@netlify/functions';
 import { getDb, ensureUser, jsonResponse, errorResponse } from './utils/db';
 
+// Ensure project column exists (one-time migration)
+async function ensureProjectColumn(sql: ReturnType<typeof getDb>) {
+  try {
+    await sql`
+      ALTER TABLE todos ADD COLUMN IF NOT EXISTS project TEXT
+    `;
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_todos_project ON todos(user_id, project)
+    `;
+  } catch (error) {
+    // Column might already exist, ignore errors
+    console.log('Project column migration:', error);
+  }
+}
+
 export default async function handler(req: Request, _context: Context) {
   const sql = getDb();
   const url = new URL(req.url);
+
+  // Run migration on first request (idempotent)
+  await ensureProjectColumn(sql);
 
   // Get userId and email from query parameters
   const netlifyUserId = url.searchParams.get('userId');
@@ -17,27 +35,52 @@ export default async function handler(req: Request, _context: Context) {
   const userId = await ensureUser(sql, netlifyUserId, email);
 
   const todoId = url.searchParams.get('id');
+  const distinctParam = url.searchParams.get('distinct');
+  const projectFilter = url.searchParams.get('project');
 
   try {
     switch (req.method) {
       case 'GET': {
-        // Get all todos for user, ordered by due date
-        const todos = await sql`
-          SELECT * FROM todos
-          WHERE user_id = ${userId}
-          ORDER BY
-            completed ASC,
-            CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
-            due_date ASC,
-            created_at DESC
-        `;
+        // Return distinct projects for autocomplete
+        if (distinctParam === 'projects') {
+          const projects = await sql`
+            SELECT DISTINCT project FROM todos
+            WHERE user_id = ${userId} AND project IS NOT NULL AND project != ''
+            ORDER BY project ASC
+          `;
+          return jsonResponse({ projects: projects.map((p: any) => p.project) });
+        }
+
+        // Get all todos for user, optionally filtered by project
+        let todos;
+        if (projectFilter) {
+          todos = await sql`
+            SELECT * FROM todos
+            WHERE user_id = ${userId} AND project = ${projectFilter}
+            ORDER BY
+              completed ASC,
+              CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
+              due_date ASC,
+              created_at DESC
+          `;
+        } else {
+          todos = await sql`
+            SELECT * FROM todos
+            WHERE user_id = ${userId}
+            ORDER BY
+              completed ASC,
+              CASE WHEN due_date IS NULL THEN 1 ELSE 0 END,
+              due_date ASC,
+              created_at DESC
+          `;
+        }
 
         return jsonResponse({ todos });
       }
 
       case 'POST': {
         const body = await req.json();
-        const { id, title, dueDate } = body;
+        const { id, title, dueDate, project } = body;
 
         if (!title) {
           return errorResponse('Title is required');
@@ -47,8 +90,8 @@ export default async function handler(req: Request, _context: Context) {
         const todoIdToUse = id || `todo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         const result = await sql`
-          INSERT INTO todos (id, user_id, title, due_date)
-          VALUES (${todoIdToUse}, ${userId}, ${title}, ${dueDate || null})
+          INSERT INTO todos (id, user_id, title, due_date, project)
+          VALUES (${todoIdToUse}, ${userId}, ${title}, ${dueDate || null}, ${project || null})
           RETURNING *
         `;
 
@@ -61,7 +104,7 @@ export default async function handler(req: Request, _context: Context) {
         }
 
         const body = await req.json();
-        const { title, dueDate, completed } = body;
+        const { title, dueDate, completed, project } = body;
 
         // Build update based on what's provided
         let result;
@@ -76,12 +119,13 @@ export default async function handler(req: Request, _context: Context) {
             RETURNING *
           `;
         } else {
-          // Update title/dueDate
+          // Update title/dueDate/project
           result = await sql`
             UPDATE todos
             SET
               title = COALESCE(${title}, title),
-              due_date = ${dueDate}
+              due_date = COALESCE(${dueDate}, due_date),
+              project = COALESCE(${project}, project)
             WHERE id = ${todoId} AND user_id = ${userId}
             RETURNING *
           `;

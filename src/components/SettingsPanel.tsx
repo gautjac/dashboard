@@ -22,18 +22,23 @@ import {
   Puzzle,
   Key,
   Copy,
+  Quote,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useQuotes, type Quote as QuoteType } from '../hooks/useQuotes';
 import type { JournalPromptStyleType, ApiKey } from '../types';
 
-type SettingsTab = 'general' | 'calendar' | 'bookmarks' | 'ai' | 'interests' | 'sync' | 'privacy';
+type SettingsTab = 'general' | 'calendar' | 'bookmarks' | 'quotes' | 'ai' | 'interests' | 'sync' | 'privacy';
 
 const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Settings className="w-4 h-4" /> },
   { id: 'calendar', label: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
   { id: 'bookmarks', label: 'Bookmarks', icon: <Bookmark className="w-4 h-4" /> },
+  { id: 'quotes', label: 'Quotes', icon: <Quote className="w-4 h-4" /> },
   { id: 'ai', label: 'AI & Analysis', icon: <Brain className="w-4 h-4" /> },
   { id: 'interests', label: 'Interests', icon: <Newspaper className="w-4 h-4" /> },
   { id: 'sync', label: 'Sync', icon: <Cloud className="w-4 h-4" /> },
@@ -70,6 +75,29 @@ export function SettingsPanel() {
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+
+  // Quotes state
+  const {
+    quotes,
+    isLoading: isLoadingQuotes,
+    error: quotesError,
+    syncEnabled: quotesSyncEnabled,
+    fetchQuotes,
+    addQuote,
+    updateQuote,
+    deleteQuote,
+  } = useQuotes();
+  const [newQuoteText, setNewQuoteText] = useState('');
+  const [newQuoteAuthor, setNewQuoteAuthor] = useState('');
+  const [editingQuote, setEditingQuote] = useState<QuoteType | null>(null);
+  const [editQuoteText, setEditQuoteText] = useState('');
+  const [editQuoteAuthor, setEditQuoteAuthor] = useState('');
+
+  // Get sync userId from localStorage (same as syncService uses)
+  const getSyncUserId = (): string | null => {
+    return localStorage.getItem('dashboard_user_id');
+  };
 
   const {
     isConfigured,
@@ -241,8 +269,13 @@ export function SettingsPanel() {
 
   // Fetch API keys on mount
   const fetchApiKeys = async () => {
+    const userId = getSyncUserId();
+    if (!userId) {
+      return; // Sync not enabled, no user ID
+    }
+
     try {
-      const response = await fetch('/.netlify/functions/api-keys');
+      const response = await fetch(`/.netlify/functions/api-keys?userId=${encodeURIComponent(userId)}`);
       if (response.ok) {
         const data = await response.json();
         setApiKeys(data.keys || []);
@@ -254,11 +287,21 @@ export function SettingsPanel() {
 
   // Generate new API key
   const handleGenerateApiKey = async () => {
+    setApiKeyError(null);
+
+    const userId = getSyncUserId();
+    if (!userId) {
+      setApiKeyError('Please enable Sync first (Settings > Sync) to generate API keys');
+      return;
+    }
+
     setIsGeneratingKey(true);
     try {
-      const response = await fetch('/.netlify/functions/api-keys', {
+      const response = await fetch(`/.netlify/functions/api-keys?userId=${encodeURIComponent(userId)}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ name: 'Browser Extension' }),
       });
 
@@ -267,9 +310,11 @@ export function SettingsPanel() {
         setNewApiKey(data.key);
         fetchApiKeys(); // Refresh the list
       } else {
-        console.error('Failed to generate API key');
+        const errorData = await response.json().catch(() => ({}));
+        setApiKeyError(errorData.error || `Failed to generate API key (${response.status})`);
       }
     } catch (error) {
+      setApiKeyError('Network error - please try again');
       console.error('Failed to generate API key:', error);
     } finally {
       setIsGeneratingKey(false);
@@ -278,8 +323,14 @@ export function SettingsPanel() {
 
   // Revoke API key
   const handleRevokeApiKey = async (keyId: string) => {
+    const userId = getSyncUserId();
+    if (!userId) {
+      console.error('No sync user ID, cannot revoke API key');
+      return;
+    }
+
     try {
-      const response = await fetch(`/.netlify/functions/api-keys?id=${keyId}`, {
+      const response = await fetch(`/.netlify/functions/api-keys?userId=${encodeURIComponent(userId)}&id=${keyId}`, {
         method: 'DELETE',
       });
 
@@ -297,6 +348,45 @@ export function SettingsPanel() {
       fetchApiKeys();
     }
   }, [activeTab]);
+
+  // Fetch quotes when quotes tab is active
+  useEffect(() => {
+    if (activeTab === 'quotes') {
+      fetchQuotes();
+    }
+  }, [activeTab, fetchQuotes]);
+
+  // Handle add quote
+  const handleAddQuote = async () => {
+    if (!newQuoteText.trim()) return;
+    try {
+      await addQuote(newQuoteText.trim(), newQuoteAuthor.trim() || undefined);
+      setNewQuoteText('');
+      setNewQuoteAuthor('');
+    } catch {
+      // Error is handled by the hook
+    }
+  };
+
+  // Handle update quote
+  const handleUpdateQuote = async () => {
+    if (!editingQuote || !editQuoteText.trim()) return;
+    try {
+      await updateQuote(editingQuote.id, editQuoteText.trim(), editQuoteAuthor.trim() || undefined);
+      setEditingQuote(null);
+      setEditQuoteText('');
+      setEditQuoteAuthor('');
+    } catch {
+      // Error is handled by the hook
+    }
+  };
+
+  // Start editing a quote
+  const startEditingQuote = (quote: QuoteType) => {
+    setEditingQuote(quote);
+    setEditQuoteText(quote.text);
+    setEditQuoteAuthor(quote.author || '');
+  };
 
   return (
     <motion.div
@@ -800,23 +890,47 @@ export function SettingsPanel() {
                             </div>
                           )}
 
-                          <button
-                            onClick={handleGenerateApiKey}
-                            disabled={isGeneratingKey}
-                            className="btn btn-secondary text-sm w-full"
-                          >
-                            {isGeneratingKey ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Key className="w-4 h-4" />
-                                Generate API Key
-                              </>
-                            )}
-                          </button>
+                          {/* Error message */}
+                          {apiKeyError && (
+                            <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                              <p className="font-ui text-sm text-red-700">{apiKeyError}</p>
+                            </div>
+                          )}
+
+                          {/* Show sync prompt if sync not enabled */}
+                          {!syncEnabled && !apiKeyError && (
+                            <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
+                              <p className="font-ui text-sm text-yellow-800 mb-2">
+                                Enable Sync first to generate API keys for the browser extension
+                              </p>
+                              <button
+                                onClick={() => setActiveTab('sync')}
+                                className="btn btn-primary text-sm"
+                              >
+                                Go to Sync Settings
+                              </button>
+                            </div>
+                          )}
+
+                          {syncEnabled && (
+                            <button
+                              onClick={handleGenerateApiKey}
+                              disabled={isGeneratingKey}
+                              className="btn btn-secondary text-sm w-full"
+                            >
+                              {isGeneratingKey ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Key className="w-4 h-4" />
+                                  Generate API Key
+                                </>
+                              )}
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -825,16 +939,20 @@ export function SettingsPanel() {
                               Your API Key (save this - it won't be shown again):
                             </p>
                             <div className="flex items-center gap-2">
-                              <code className="flex-1 font-mono text-xs bg-white p-2 rounded border border-sage/30 break-all">
-                                {newApiKey}
-                              </code>
+                              <input
+                                type="text"
+                                readOnly
+                                value={newApiKey}
+                                onClick={(e) => (e.target as HTMLInputElement).select()}
+                                className="flex-1 font-mono text-xs bg-white p-2 rounded border border-sage/30 cursor-text select-all"
+                              />
                               <button
                                 onClick={() => {
                                   navigator.clipboard.writeText(newApiKey);
                                   setCopiedKey(true);
                                   setTimeout(() => setCopiedKey(false), 2000);
                                 }}
-                                className="btn-ghost p-2 rounded-lg text-sage-dark hover:bg-sage-light/50"
+                                className="btn-ghost p-2 rounded-lg text-sage-dark hover:bg-sage-light/50 flex-shrink-0"
                                 title="Copy to clipboard"
                               >
                                 {copiedKey ? (
@@ -844,6 +962,9 @@ export function SettingsPanel() {
                                 )}
                               </button>
                             </div>
+                            <p className="font-ui text-xs text-sage-dark mt-2">
+                              Click the key to select it, or use the copy button
+                            </p>
                           </div>
                           <button
                             onClick={() => setNewApiKey(null)}
@@ -867,6 +988,176 @@ export function SettingsPanel() {
                       </ol>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'quotes' && (
+              <div className="space-y-6">
+                <p className="font-ui text-sm text-ink-muted">
+                  Add inspirational quotes that will be displayed randomly below your daily focus line.
+                </p>
+
+                {/* Sync warning */}
+                {!quotesSyncEnabled && (
+                  <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-ui text-sm font-medium text-yellow-800">
+                          Sync required
+                        </p>
+                        <p className="font-ui text-xs text-yellow-700 mt-1 mb-3">
+                          Enable Sync to save and manage your quotes collection.
+                        </p>
+                        <button
+                          onClick={() => setActiveTab('sync')}
+                          className="btn btn-primary text-sm"
+                        >
+                          Go to Sync Settings
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error display */}
+                {quotesError && (
+                  <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                    <p className="font-ui text-sm text-red-700">{quotesError}</p>
+                  </div>
+                )}
+
+                {/* Add new quote form */}
+                <div className="p-4 rounded-lg border border-warm-gray-dark bg-parchment">
+                  <label className="font-ui text-sm font-medium text-ink block mb-3">
+                    Add a new quote
+                  </label>
+                  <div className="space-y-3">
+                    <textarea
+                      value={newQuoteText}
+                      onChange={(e) => setNewQuoteText(e.target.value)}
+                      placeholder="Enter the quote text..."
+                      rows={3}
+                      className="input w-full resize-none text-sm"
+                    />
+                    <input
+                      type="text"
+                      value={newQuoteAuthor}
+                      onChange={(e) => setNewQuoteAuthor(e.target.value)}
+                      placeholder="Author (optional)"
+                      className="input w-full text-sm"
+                    />
+                    <button
+                      onClick={handleAddQuote}
+                      disabled={!newQuoteText.trim() || !quotesSyncEnabled}
+                      className="btn btn-primary text-sm disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Quote
+                    </button>
+                  </div>
+                </div>
+
+                {/* Existing quotes list */}
+                <div>
+                  <label className="font-ui text-sm font-medium text-ink block mb-3">
+                    Your quotes ({quotes.length})
+                  </label>
+
+                  {isLoadingQuotes ? (
+                    <div className="py-8 text-center">
+                      <Loader2 className="w-6 h-6 mx-auto text-ink-muted animate-spin" />
+                      <p className="mt-2 font-ui text-sm text-ink-muted">Loading quotes...</p>
+                    </div>
+                  ) : quotes.length === 0 ? (
+                    <div className="py-8 text-center border border-dashed border-warm-gray-dark rounded-lg">
+                      <Quote className="w-8 h-8 mx-auto text-ink-muted mb-2" />
+                      <p className="font-ui text-sm text-ink-muted">
+                        No quotes yet. Add your first quote above!
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {quotes.map((quote) => (
+                        <div
+                          key={quote.id}
+                          className="p-3 rounded-lg bg-warm-gray/30 group"
+                        >
+                          {editingQuote?.id === quote.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editQuoteText}
+                                onChange={(e) => setEditQuoteText(e.target.value)}
+                                rows={2}
+                                className="input w-full resize-none text-sm"
+                                autoFocus
+                              />
+                              <input
+                                type="text"
+                                value={editQuoteAuthor}
+                                onChange={(e) => setEditQuoteAuthor(e.target.value)}
+                                placeholder="Author (optional)"
+                                className="input w-full text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleUpdateQuote}
+                                  disabled={!editQuoteText.trim()}
+                                  className="btn btn-primary text-xs disabled:opacity-50"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingQuote(null);
+                                    setEditQuoteText('');
+                                    setEditQuoteAuthor('');
+                                  }}
+                                  className="btn btn-secondary text-xs"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="font-body text-sm text-ink-light italic">
+                                "{quote.text}"
+                              </p>
+                              {quote.author && (
+                                <p className="font-ui text-xs text-ink-muted mt-1">
+                                  — {quote.author}
+                                </p>
+                              )}
+                              <div className="mt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => startEditingQuote(quote)}
+                                  className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
+                                  title="Edit quote"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteQuote(quote.id)}
+                                  className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-red-500"
+                                  title="Delete quote"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 rounded-lg bg-warm-gray/30">
+                  <p className="font-ui text-xs text-ink-muted">
+                    A random quote from your collection will be displayed below your daily focus line each time you visit the dashboard.
+                  </p>
                 </div>
               </div>
             )}
@@ -946,6 +1237,45 @@ export function SettingsPanel() {
                             </p>
                           </div>
                         </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Perplexity API Key for Daily Brief */}
+                <div className="p-4 rounded-lg border border-warm-gray-dark">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-terracotta-light/30 flex items-center justify-center flex-shrink-0">
+                      <Newspaper className="w-5 h-5 text-terracotta" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="font-ui text-sm font-medium text-ink block">
+                        Perplexity API Key
+                      </label>
+                      <p className="font-ui text-xs text-ink-muted mt-1 mb-3">
+                        Enable real news articles in your Daily Brief with links to sources.
+                        Get your API key from{' '}
+                        <a
+                          href="https://www.perplexity.ai/settings/api"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-terracotta hover:text-terracotta-dark"
+                        >
+                          perplexity.ai/settings/api
+                        </a>
+                      </p>
+                      <input
+                        type="password"
+                        value={settings.perplexityApiKey || ''}
+                        onChange={(e) => updateSettings({ perplexityApiKey: e.target.value })}
+                        placeholder="pplx-xxxxxxxxxxxxxxxx"
+                        className="input w-full text-sm"
+                      />
+                      {settings.perplexityApiKey && (
+                        <p className="font-ui text-xs text-sage-dark mt-2 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          API key configured
+                        </p>
                       )}
                     </div>
                   </div>

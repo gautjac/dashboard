@@ -10,14 +10,6 @@ export default async function handler(req: Request, context: Context) {
     return errorResponse('Method not allowed', 405);
   }
 
-  // Verify user is authenticated
-  const netlifyUserId = getUserIdFromContext(context);
-  const email = getUserEmailFromContext(context);
-
-  if (!netlifyUserId || !email) {
-    return unauthorizedResponse();
-  }
-
   // Get API key from environment (securely stored in Netlify)
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -27,6 +19,16 @@ export default async function handler(req: Request, context: Context) {
   try {
     const body = await req.json();
     const { action, ...params } = body;
+
+    // Some actions don't require user authentication (e.g., enhanceBrief which just processes articles)
+    const authRequiredActions = ['generatePrompt', 'generateReflection', 'generateBrief', 'generateInsights'];
+    if (authRequiredActions.includes(action)) {
+      const netlifyUserId = getUserIdFromContext(context);
+      const email = getUserEmailFromContext(context);
+      if (!netlifyUserId || !email) {
+        return unauthorizedResponse();
+      }
+    }
 
     let messages: any[];
     let system: string | undefined;
@@ -166,6 +168,93 @@ Make the items feel current and relevant. The "why it matters" should connect to
         break;
       }
 
+      case 'enhanceBrief': {
+        // Enhance real articles from Perplexity with personalized insights
+        console.log('enhanceBrief action called');
+        const { articles, interests } = params;
+
+        if (!articles || articles.length === 0) {
+          console.log('No articles to enhance');
+          return jsonResponse({ items: [], followUpQuestions: [] });
+        }
+        console.log('Enhancing', articles.length, 'articles');
+
+        const interestsPrompt = (interests || [])
+          .filter((i: any) => i.enabled)
+          .map((i: any) => `- ${i.name}: ${(i.keywords || []).join(', ')}`)
+          .join('\n');
+
+        const articlesJson = JSON.stringify(articles, null, 2);
+
+        system = `You are a personal news analyst. You enhance real news articles with personalized "why it matters" insights based on the reader's interests. Return valid JSON only.`;
+        maxTokens = 2000;
+        messages = [{
+          role: 'user',
+          content: `Here are real news articles. Add a personalized "whyItMatters" insight to each one based on these interest areas:
+
+${interestsPrompt}
+
+Articles:
+${articlesJson}
+
+For each article:
+1. Keep the original title, source, sourceUrl, summary, and topic
+2. Add a "whyItMatters" field with a 1-2 sentence insight connecting this news to someone interested in these topics
+3. Generate an id for each item (use format: "brief-1", "brief-2", etc.)
+
+Also generate 3 thought-provoking follow-up questions about these topics.
+
+Return JSON:
+{
+  "items": [
+    {
+      "id": "brief-1",
+      "title": "original title",
+      "summary": "original or slightly improved summary",
+      "source": "source name",
+      "sourceUrl": "original URL",
+      "whyItMatters": "personalized insight",
+      "topic": "topic"
+    }
+  ],
+  "followUpQuestions": ["question 1", "question 2", "question 3"]
+}`
+        }];
+        break;
+      }
+
+      case 'enhanceSingleItem': {
+        // Enhance a single article with "why it matters" insight
+        const { article, interests } = params;
+
+        if (!article) {
+          return errorResponse('Article is required', 400);
+        }
+
+        const interestsPrompt = (interests || [])
+          .filter((i: any) => i.enabled)
+          .map((i: any) => `- ${i.name}: ${(i.keywords || []).join(', ')}`)
+          .join('\n');
+
+        system = `You are a personal news analyst. Generate a brief, insightful "why it matters" analysis for a news article based on the reader's interests.`;
+        maxTokens = 300;
+        messages = [{
+          role: 'user',
+          content: `Based on these interest areas:
+${interestsPrompt}
+
+Analyze this article and explain why it matters to someone with these interests:
+
+Title: ${article.title}
+Source: ${article.source}
+Summary: ${article.summary}
+Topic: ${article.topic}
+
+Provide a 1-2 sentence "why it matters" insight that connects this news to someone interested in these topics. Be specific and actionable. Return only the insight text, nothing else.`
+        }];
+        break;
+      }
+
       case 'generateInsights': {
         const { entries, habits, weekStart, weekEnd } = params;
 
@@ -252,11 +341,17 @@ Be specific and grounded in what was actually written. Don't invent themes that 
     const text = textBlock?.text || '';
 
     // For JSON responses, try to parse
-    if (action === 'generateBrief' || action === 'generateInsights') {
+    if (action === 'generateBrief' || action === 'generateInsights' || action === 'enhanceBrief') {
+      console.log('Parsing JSON response for action:', action);
+      console.log('Raw text length:', text.length);
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          return jsonResponse(JSON.parse(jsonMatch[0]));
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log('Parsed items count:', parsed.items?.length, 'First item has whyItMatters:', !!parsed.items?.[0]?.whyItMatters);
+          return jsonResponse(parsed);
+        } else {
+          console.log('No JSON match found in response');
         }
       } catch (e) {
         console.error('Failed to parse JSON from response:', e);

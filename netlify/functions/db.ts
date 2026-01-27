@@ -130,6 +130,7 @@ export async function initializeSchema() {
       tweet_text TEXT,
       media_urls TEXT[],
       bookmarked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      archived_at TIMESTAMP WITH TIME ZONE,
       UNIQUE(user_id, tweet_id)
     )
   `;
@@ -146,6 +147,40 @@ export async function initializeSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS links (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      title TEXT,
+      summary TEXT,
+      saved_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      archived_at TIMESTAMP WITH TIME ZONE,
+      UNIQUE(user_id, url)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS quotes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      text TEXT NOT NULL,
+      author TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS ideas (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      text TEXT NOT NULL,
+      category TEXT,
+      archived_at TIMESTAMP WITH TIME ZONE,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_completions_habit ON habit_completions(habit_id)`;
@@ -158,6 +193,54 @@ export async function initializeSchema() {
   await sql`CREATE INDEX IF NOT EXISTS idx_bookmarks_user_date ON extension_bookmarks(user_id, bookmarked_at DESC)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_todos_user ON todos(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_todos_user_due ON todos(user_id, due_date)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_links_user ON links(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_links_user_date ON links(user_id, saved_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_quotes_user ON quotes(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_ideas_user ON ideas(user_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_ideas_user_date ON ideas(user_id, created_at DESC)`;
+
+  // Add archived_at columns if they don't exist (migrations)
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='links' AND column_name='archived_at') THEN
+        ALTER TABLE links ADD COLUMN archived_at TIMESTAMP WITH TIME ZONE;
+      END IF;
+    END $$;
+  `;
+
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='extension_bookmarks' AND column_name='archived_at') THEN
+        ALTER TABLE extension_bookmarks ADD COLUMN archived_at TIMESTAMP WITH TIME ZONE;
+      END IF;
+    END $$;
+  `;
+
+  // Add project column to todos if it doesn't exist
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='todos' AND column_name='project') THEN
+        ALTER TABLE todos ADD COLUMN project TEXT;
+      END IF;
+    END $$;
+  `;
+
+  // Add summary column to extension_bookmarks if it doesn't exist
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='extension_bookmarks' AND column_name='summary') THEN
+        ALTER TABLE extension_bookmarks ADD COLUMN summary TEXT;
+      END IF;
+    END $$;
+  `;
 
   return { success: true };
 }

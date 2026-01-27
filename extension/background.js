@@ -1,5 +1,10 @@
 // Background service worker for Daily Dashboard X Bookmarks extension
 
+const DEBUG = true;
+function log(...args) {
+  if (DEBUG) console.log('[DD Background]', ...args);
+}
+
 const DEFAULT_API_URL = 'https://dashboard-jac.netlify.app';
 
 // Queue for batching bookmark uploads
@@ -18,12 +23,16 @@ async function getSettings() {
 
 // Upload bookmarks to the API
 async function uploadBookmarks(bookmarks) {
+  log('uploadBookmarks called with', bookmarks.length, 'bookmarks');
   const settings = await getSettings();
 
   if (!settings.apiKey || !settings.enabled) {
-    console.log('Extension not configured or disabled');
+    log('Extension not configured or disabled', { hasKey: !!settings.apiKey, enabled: settings.enabled });
     return { success: false, error: 'Not configured' };
   }
+
+  log('Uploading to:', `${settings.apiUrl}/.netlify/functions/extension-bookmarks`);
+  log('API Key prefix:', settings.apiKey.substring(0, 10) + '...');
 
   try {
     const response = await fetch(`${settings.apiUrl}/.netlify/functions/extension-bookmarks`, {
@@ -35,12 +44,22 @@ async function uploadBookmarks(bookmarks) {
       body: JSON.stringify(bookmarks)
     });
 
+    log('Response status:', response.status);
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Upload failed');
+      const errorText = await response.text();
+      log('Error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error: errorText };
+      }
+      throw new Error(error.error || `Upload failed: ${response.status}`);
     }
 
     const data = await response.json();
+    log('Upload successful:', data);
 
     // Update badge to show success
     chrome.action.setBadgeText({ text: '✓' });
@@ -49,7 +68,7 @@ async function uploadBookmarks(bookmarks) {
 
     return { success: true, added: data.added };
   } catch (error) {
-    console.error('Failed to upload bookmarks:', error);
+    log('Failed to upload bookmarks:', error);
 
     // Update badge to show error
     chrome.action.setBadgeText({ text: '!' });
@@ -81,41 +100,62 @@ async function processQueue() {
 
 // Add bookmark to queue
 function queueBookmark(bookmark) {
+  if (!bookmark || !bookmark.tweetId) {
+    log('Invalid bookmark, skipping:', bookmark);
+    return;
+  }
+
   // Check for duplicates in queue
   const exists = bookmarkQueue.some(b => b.tweetId === bookmark.tweetId);
   if (!exists) {
     bookmarkQueue.push(bookmark);
+    log('Added to queue:', bookmark.tweetId, '- Queue size:', bookmarkQueue.length);
+  } else {
+    log('Duplicate, already in queue:', bookmark.tweetId);
   }
 
   // Debounce: wait 1 second for more bookmarks before uploading
   if (uploadTimeout) {
     clearTimeout(uploadTimeout);
   }
-  uploadTimeout = setTimeout(processQueue, 1000);
+  uploadTimeout = setTimeout(() => {
+    log('Debounce timer fired, processing queue');
+    processQueue();
+  }, 1000);
 }
 
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  log('Received message:', message.type, 'from:', sender.tab?.url || 'popup/options');
+
   if (message.type === 'BOOKMARK_DETECTED') {
+    log('Bookmark detected:', message.bookmark?.tweetId);
     queueBookmark(message.bookmark);
     sendResponse({ success: true, queued: true });
   } else if (message.type === 'BOOKMARKS_BATCH') {
+    log('Batch of', message.bookmarks?.length, 'bookmarks received');
     message.bookmarks.forEach(bookmark => queueBookmark(bookmark));
     sendResponse({ success: true, queued: message.bookmarks.length });
   } else if (message.type === 'SYNC_NOW') {
-    processQueue().then(result => sendResponse(result));
+    log('Manual sync requested');
+    processQueue().then(result => {
+      log('Sync result:', result);
+      sendResponse(result);
+    });
     return true; // Keep channel open for async response
   } else if (message.type === 'GET_STATUS') {
     chrome.storage.local.get(['syncCount', 'lastSync', 'lastError']).then(stats => {
       getSettings().then(settings => {
-        sendResponse({
+        const status = {
           configured: Boolean(settings.apiKey),
           enabled: settings.enabled,
           syncCount: stats.syncCount || 0,
           lastSync: stats.lastSync,
           lastError: stats.lastError,
           queueSize: bookmarkQueue.length
-        });
+        };
+        log('Returning status:', status);
+        sendResponse(status);
       });
     });
     return true; // Keep channel open for async response
@@ -124,6 +164,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 // Initialize
-chrome.runtime.onInstalled.addListener(() => {
-  console.log('Daily Dashboard X Bookmarks extension installed');
+chrome.runtime.onInstalled.addListener((details) => {
+  log('Extension installed/updated:', details.reason);
+  // Check initial settings
+  getSettings().then(settings => {
+    log('Initial settings:', { hasKey: !!settings.apiKey, enabled: settings.enabled });
+  });
 });
+
+// Also log when service worker starts
+log('Background service worker started');

@@ -7,10 +7,12 @@ interface UseTodosReturn {
   todos: Todo[];
   isLoading: boolean;
   error: string | null;
-  addTodo: (title: string, dueDate: string | null) => Promise<void>;
+  addTodo: (title: string, dueDate: string | null, project?: string | null) => Promise<void>;
+  updateTodo: (id: string, updates: Partial<Pick<Todo, 'title' | 'dueDate' | 'project'>>) => Promise<void>;
   toggleTodo: (id: string) => Promise<void>;
   deleteTodo: (id: string) => Promise<void>;
   refreshTodos: () => Promise<void>;
+  projects: string[];
 }
 
 // Get user info - try localStorage first (for sync), then Netlify Identity
@@ -40,6 +42,7 @@ function mapTodoFromApi(apiTodo: any): Todo {
     completed: apiTodo.completed,
     completedAt: apiTodo.completed_at,
     createdAt: apiTodo.created_at,
+    project: apiTodo.project || null,
   };
 }
 
@@ -88,7 +91,7 @@ export function useTodos(): UseTodosReturn {
     fetchTodos();
   }, [fetchTodos]);
 
-  const addTodo = useCallback(async (title: string, dueDate: string | null) => {
+  const addTodo = useCallback(async (title: string, dueDate: string | null, project?: string | null) => {
     const userInfo = getUserInfo();
     if (!userInfo) {
       throw new Error('Not authenticated');
@@ -96,7 +99,7 @@ export function useTodos(): UseTodosReturn {
 
     // Optimistically add locally
     const tempId = `temp-${Date.now()}`;
-    addTodoLocal({ title, dueDate });
+    addTodoLocal({ title, dueDate, project: project || null });
 
     try {
       const params = new URLSearchParams({
@@ -106,7 +109,7 @@ export function useTodos(): UseTodosReturn {
       const response = await fetch(`/.netlify/functions/todos?${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, dueDate }),
+        body: JSON.stringify({ title, dueDate, project: project || null }),
       });
 
       if (!response.ok) {
@@ -121,6 +124,40 @@ export function useTodos(): UseTodosReturn {
       throw err;
     }
   }, [addTodoLocal, deleteTodoLocal, fetchTodos]);
+
+  const updateTodo = useCallback(async (id: string, updates: Partial<Pick<Todo, 'title' | 'dueDate' | 'project'>>) => {
+    const userInfo = getUserInfo();
+    if (!userInfo) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+        id,
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: updates.title,
+          dueDate: updates.dueDate,
+          project: updates.project,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update todo');
+      }
+
+      // Refresh to get updated data
+      await fetchTodos();
+    } catch (err) {
+      console.error('Update todo error:', err);
+      throw err;
+    }
+  }, [fetchTodos]);
 
   const toggleTodo = useCallback(async (id: string) => {
     const userInfo = getUserInfo();
@@ -181,13 +218,18 @@ export function useTodos(): UseTodosReturn {
     }
   }, [deleteTodoLocal, fetchTodos]);
 
+  // Derive unique projects from todos
+  const projects = [...new Set(todos.map(t => t.project).filter((p): p is string => !!p))].sort();
+
   return {
     todos,
     isLoading,
     error,
     addTodo,
+    updateTodo,
     toggleTodo,
     deleteTodo,
     refreshTodos: fetchTodos,
+    projects,
   };
 }

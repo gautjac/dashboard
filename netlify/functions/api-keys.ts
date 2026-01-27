@@ -1,5 +1,5 @@
 import type { Context } from '@netlify/functions';
-import { getDb, getUserIdFromContext, getUserEmailFromContext, ensureUser, jsonResponse, errorResponse, unauthorizedResponse } from './utils/db';
+import { getDb, jsonResponse, errorResponse } from './utils/db';
 
 // Generate a random API key
 function generateApiKey(): string {
@@ -26,21 +26,31 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
 
-export default async function handler(req: Request, context: Context) {
+export default async function handler(req: Request, _context: Context) {
   const sql = getDb();
+  const url = new URL(req.url);
 
-  // Get user from Netlify Identity
-  const netlifyUserId = getUserIdFromContext(context);
-  const email = getUserEmailFromContext(context);
+  // Get userId from query parameter (same as sync endpoint)
+  const userId = url.searchParams.get('userId');
 
-  if (!netlifyUserId || !email) {
-    return unauthorizedResponse();
+  if (!userId) {
+    return errorResponse('userId parameter is required. Enable sync in Settings first.', 401);
   }
 
-  // Ensure user exists in database
-  const userId = await ensureUser(sql, netlifyUserId, email);
+  // Verify user exists in database
+  const userCheck = await sql`SELECT id FROM users WHERE id = ${userId} OR email = ${userId}`;
+  if (userCheck.length === 0) {
+    // Create user if not exists (using userId as both id and email placeholder)
+    await sql`
+      INSERT INTO users (id, email, name)
+      VALUES (${userId}, ${userId}, ${userId.split('@')[0]})
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
 
-  const url = new URL(req.url);
+  // Use the userId directly (it could be an email or custom ID)
+  const effectiveUserId = userCheck.length > 0 ? userCheck[0].id : userId;
+
   const keyId = url.searchParams.get('id');
 
   try {
@@ -50,7 +60,7 @@ export default async function handler(req: Request, context: Context) {
         const keys = await sql`
           SELECT id, name, created_at, last_used_at
           FROM api_keys
-          WHERE user_id = ${userId}
+          WHERE user_id = ${effectiveUserId}
           ORDER BY created_at DESC
         `;
 
@@ -68,7 +78,7 @@ export default async function handler(req: Request, context: Context) {
 
         await sql`
           INSERT INTO api_keys (id, user_id, key_hash, name)
-          VALUES (${id}, ${userId}, ${keyHash}, ${name || 'Browser Extension'})
+          VALUES (${id}, ${effectiveUserId}, ${keyHash}, ${name || 'Browser Extension'})
         `;
 
         // Return the plain key ONCE - it won't be retrievable again
@@ -87,7 +97,7 @@ export default async function handler(req: Request, context: Context) {
 
         const result = await sql`
           DELETE FROM api_keys
-          WHERE id = ${keyId} AND user_id = ${userId}
+          WHERE id = ${keyId} AND user_id = ${effectiveUserId}
           RETURNING id
         `;
 

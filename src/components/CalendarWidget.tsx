@@ -14,6 +14,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
 import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useCollapsedState } from '../hooks/useCollapsedState';
 import type { CalendarEvent } from '../types';
 
 interface EventItemProps {
@@ -303,6 +304,7 @@ export function CalendarWidget() {
   } = useGoogleCalendar();
 
   const [showNewEventForm, setShowNewEventForm] = useState(false);
+  const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('calendar');
 
   // Use Google events if authenticated, otherwise use store events (sample data)
   const events = isAuthenticated ? googleEvents : getTodayEvents();
@@ -368,13 +370,27 @@ export function CalendarWidget() {
       className="card p-5"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-between ${!isCollapsed ? 'mb-4' : ''}`}>
+        <button
+          onClick={toggleCollapsed}
+          className="flex items-center gap-2 hover:opacity-70 transition-opacity"
+        >
+          <motion.div
+            animate={{ rotate: isCollapsed ? 0 : 90 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronRight className="w-5 h-5 text-ink-muted" />
+          </motion.div>
           <Calendar className="w-5 h-5 text-ink-muted" />
           <h3 className="font-display text-xl font-semibold text-ink">
             Today's Schedule
           </h3>
-        </div>
+          {isCollapsed && events.length > 0 && (
+            <span className="font-ui text-sm text-ink-muted">
+              ({events.length} event{events.length !== 1 ? 's' : ''})
+            </span>
+          )}
+        </button>
         <div className="flex items-center gap-1">
           {isAuthenticated && (
             <>
@@ -406,123 +422,136 @@ export function CalendarWidget() {
         </div>
       </div>
 
-      {/* New Event Form */}
-      <AnimatePresence>
-        {showNewEventForm && (
-          <div className="mb-4">
-            <NewEventForm
-              onSubmit={async (params) => {
-                await createEvent(params);
-                setShowNewEventForm(false);
-              }}
-              onCancel={() => setShowNewEventForm(false)}
-              isLoading={isLoading}
-            />
-          </div>
+      {/* Collapsible content */}
+      <AnimatePresence initial={false}>
+        {!isCollapsed && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            {/* New Event Form */}
+            <AnimatePresence>
+              {showNewEventForm && (
+                <div className="mb-4">
+                  <NewEventForm
+                    onSubmit={async (params) => {
+                      await createEvent(params);
+                      setShowNewEventForm(false);
+                    }}
+                    onCancel={() => setShowNewEventForm(false)}
+                    isLoading={isLoading}
+                  />
+                </div>
+              )}
+            </AnimatePresence>
+
+            {/* Not connected state */}
+            {!isAuthenticated && events.length === 0 ? (
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-ink-muted" />
+                </div>
+                <p className="font-ui text-sm text-ink-muted mb-4">
+                  Connect your calendar to see today's events
+                </p>
+                <button
+                  onClick={handleConnectClick}
+                  disabled={isLoading}
+                  className="btn btn-secondary text-sm disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    'Connect Google Calendar'
+                  )}
+                </button>
+              </div>
+            ) : events.length === 0 ? (
+              // No events today (but connected)
+              <div className="py-8 text-center">
+                <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-sage-light/50 flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-sage-dark" />
+                </div>
+                <p className="font-display text-lg text-ink">Clear day ahead</p>
+                <p className="font-ui text-sm text-ink-muted mt-1">
+                  No scheduled events
+                </p>
+              </div>
+            ) : (
+              // Events list
+              <div className="space-y-2">
+                {scheduleWithFreeBlocks.map((item, index) => {
+                  if (item.type === 'free') {
+                    return (
+                      <FreeBlock
+                        key={`free-${index}`}
+                        start={item.start}
+                        end={item.end}
+                      />
+                    );
+                  }
+
+                  const eventIndex = sortedEvents.findIndex(
+                    (e) => e.id === item.event.id
+                  );
+                  const isPast =
+                    eventIndex < currentEventIndex ||
+                    (currentEventIndex === -1 &&
+                      isBefore(parseISO(item.event.end), now));
+                  const isNow = eventIndex === currentEventIndex;
+
+                  return (
+                    <EventItem
+                      key={item.event.id}
+                      event={item.event}
+                      isNow={isNow}
+                      isPast={isPast}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Connection status indicator */}
+            {isAuthenticated && (
+              <div className="mt-4 pt-3 border-t border-warm-gray/50">
+                <div className="flex items-center justify-between">
+                  <span className="font-ui text-xs text-sage-dark flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-sage" />
+                    Connected to Google Calendar
+                  </span>
+                  {events.length > 5 && (
+                    <button className="flex items-center gap-1 font-ui text-xs text-ink-muted hover:text-ink transition-colors">
+                      View all
+                      <ChevronRight className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sample data indicator */}
+            {!isAuthenticated && events.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-warm-gray/50">
+                <button
+                  onClick={handleConnectClick}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Connect real calendar
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Not connected state */}
-      {!isAuthenticated && events.length === 0 ? (
-        <div className="py-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-warm-gray flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-ink-muted" />
-          </div>
-          <p className="font-ui text-sm text-ink-muted mb-4">
-            Connect your calendar to see today's events
-          </p>
-          <button
-            onClick={handleConnectClick}
-            disabled={isLoading}
-            className="btn btn-secondary text-sm disabled:opacity-50"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              'Connect Google Calendar'
-            )}
-          </button>
-        </div>
-      ) : events.length === 0 ? (
-        // No events today (but connected)
-        <div className="py-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-sage-light/50 flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-sage-dark" />
-          </div>
-          <p className="font-display text-lg text-ink">Clear day ahead</p>
-          <p className="font-ui text-sm text-ink-muted mt-1">
-            No scheduled events
-          </p>
-        </div>
-      ) : (
-        // Events list
-        <div className="space-y-2">
-          {scheduleWithFreeBlocks.map((item, index) => {
-            if (item.type === 'free') {
-              return (
-                <FreeBlock
-                  key={`free-${index}`}
-                  start={item.start}
-                  end={item.end}
-                />
-              );
-            }
-
-            const eventIndex = sortedEvents.findIndex(
-              (e) => e.id === item.event.id
-            );
-            const isPast =
-              eventIndex < currentEventIndex ||
-              (currentEventIndex === -1 &&
-                isBefore(parseISO(item.event.end), now));
-            const isNow = eventIndex === currentEventIndex;
-
-            return (
-              <EventItem
-                key={item.event.id}
-                event={item.event}
-                isNow={isNow}
-                isPast={isPast}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Connection status indicator */}
-      {isAuthenticated && (
-        <div className="mt-4 pt-3 border-t border-warm-gray/50">
-          <div className="flex items-center justify-between">
-            <span className="font-ui text-xs text-sage-dark flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-sage" />
-              Connected to Google Calendar
-            </span>
-            {events.length > 5 && (
-              <button className="flex items-center gap-1 font-ui text-xs text-ink-muted hover:text-ink transition-colors">
-                View all
-                <ChevronRight className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Sample data indicator */}
-      {!isAuthenticated && events.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-warm-gray/50">
-          <button
-            onClick={handleConnectClick}
-            className="w-full flex items-center justify-center gap-2 py-2 text-ink-muted hover:text-ink font-ui text-sm transition-colors"
-          >
-            <Calendar className="w-4 h-4" />
-            Connect real calendar
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
     </motion.div>
   );
 }

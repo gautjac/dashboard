@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckSquare, Calendar, ArrowLeft, Check } from 'lucide-react';
 import { format } from 'date-fns';
 import netlifyIdentity from 'netlify-identity-widget';
+import { ProjectSelect } from './ProjectSelect';
 
 // Get user info - try localStorage first (for sync), then Netlify Identity
 function getUserInfo(): { userId: string; email: string } | null {
@@ -26,6 +27,8 @@ export function QuickAddTodo() {
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [project, setProject] = useState<string | null>(null);
+  const [projects, setProjects] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,31 @@ export function QuickAddTodo() {
   // Set today as default due date
   useEffect(() => {
     setDueDate(format(new Date(), 'yyyy-MM-dd'));
+  }, []);
+
+  // Fetch existing projects for autocomplete
+  const fetchProjects = async () => {
+    const userInfo = getUserInfo();
+    if (!userInfo) return;
+
+    try {
+      const params = new URLSearchParams({
+        userId: userInfo.userId,
+        email: userInfo.email,
+        distinct: 'projects',
+      });
+      const response = await fetch(`/.netlify/functions/todos?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setProjects(data.projects || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch projects:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +87,7 @@ export function QuickAddTodo() {
         body: JSON.stringify({
           title: title.trim(),
           dueDate: dueDate || null,
+          project: project,
         }),
       });
 
@@ -71,6 +100,12 @@ export function QuickAddTodo() {
 
       setSuccess(true);
       setTitle('');
+
+      // If a new project was used, add it to the list for autocomplete
+      if (project && !projects.includes(project)) {
+        setProjects(prev => [...prev, project].sort());
+      }
+      setProject(null);
 
       // Reset after showing success
       setTimeout(() => {
@@ -140,6 +175,19 @@ export function QuickAddTodo() {
                 style={{ width: '100%' }}
               />
             </div>
+          </div>
+
+          {/* Project */}
+          <div>
+            <label className="block font-ui text-sm font-medium text-ink mb-2">
+              Project
+            </label>
+            <ProjectSelect
+              value={project}
+              onChange={setProject}
+              projects={projects}
+              placeholder="Project (optional)"
+            />
           </div>
 
           {/* Error message */}

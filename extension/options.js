@@ -18,11 +18,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Test connection
   testBtn.addEventListener('click', async () => {
-    const apiKey = apiKeyInput.value.trim();
+    // Sanitize API key - remove any non-ASCII characters and whitespace
+    const apiKey = apiKeyInput.value.trim().replace(/[^\x00-\x7F]/g, '');
     const apiUrl = apiUrlInput.value.trim() || DEFAULT_API_URL;
+
+    // Update the input with sanitized value
+    apiKeyInput.value = apiKey;
 
     if (!apiKey) {
       showTestResult('Please enter an API key', 'error');
+      return;
+    }
+
+    if (!apiKey.startsWith('dd_')) {
+      showTestResult('API key should start with "dd_"', 'error');
       return;
     }
 
@@ -58,9 +67,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const apiKey = apiKeyInput.value.trim();
+    // Sanitize API key - remove any non-ASCII characters and whitespace
+    const apiKey = apiKeyInput.value.trim().replace(/[^\x00-\x7F]/g, '');
     const apiUrl = apiUrlInput.value.trim() || DEFAULT_API_URL;
     const enabled = enabledInput.checked;
+
+    // Update the input with sanitized value
+    apiKeyInput.value = apiKey;
 
     await chrome.storage.sync.set({
       apiKey,

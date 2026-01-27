@@ -1,4 +1,10 @@
 // Content script for detecting X/Twitter bookmarks
+// Debug mode - set to true to see console logs
+const DEBUG = true;
+
+function log(...args) {
+  if (DEBUG) console.log('[DD Bookmarks]', ...args);
+}
 
 // Track processed tweets to avoid duplicates
 const processedTweets = new Set();
@@ -6,35 +12,80 @@ const processedTweets = new Set();
 // Extract tweet data from a tweet article element
 function extractTweetData(tweetElement) {
   try {
-    // Find the tweet link to get the tweet ID
-    const tweetLink = tweetElement.querySelector('a[href*="/status/"]');
-    if (!tweetLink) return null;
+    // Find the tweet link to get the tweet ID - try multiple selectors
+    let tweetLink = tweetElement.querySelector('a[href*="/status/"]');
+
+    // Also check time element links (X sometimes uses these)
+    if (!tweetLink) {
+      tweetLink = tweetElement.querySelector('time')?.closest('a[href*="/status/"]');
+    }
+
+    if (!tweetLink) {
+      log('No tweet link found in element');
+      return null;
+    }
 
     const href = tweetLink.getAttribute('href');
     const match = href.match(/\/([^/]+)\/status\/(\d+)/);
-    if (!match) return null;
+    if (!match) {
+      log('Could not parse tweet URL:', href);
+      return null;
+    }
 
     const authorHandle = match[1];
     const tweetId = match[2];
 
     // Skip if already processed
-    if (processedTweets.has(tweetId)) return null;
+    if (processedTweets.has(tweetId)) {
+      return null;
+    }
 
-    // Get author name
-    const authorNameEl = tweetElement.querySelector('[data-testid="User-Name"] a span');
-    const authorName = authorNameEl ? authorNameEl.textContent : authorHandle;
+    // Get author name - try multiple selectors
+    let authorName = authorHandle;
+    const authorSelectors = [
+      '[data-testid="User-Name"] a span',
+      '[data-testid="User-Name"] span span',
+      'a[role="link"] span span'
+    ];
+    for (const selector of authorSelectors) {
+      const el = tweetElement.querySelector(selector);
+      if (el?.textContent && el.textContent.trim() && !el.textContent.startsWith('@')) {
+        authorName = el.textContent.trim();
+        break;
+      }
+    }
 
-    // Get tweet text
-    const tweetTextEl = tweetElement.querySelector('[data-testid="tweetText"]');
-    const tweetText = tweetTextEl ? tweetTextEl.textContent : '';
+    // Get tweet text - try multiple selectors
+    let tweetText = '';
+    const textSelectors = [
+      '[data-testid="tweetText"]',
+      '[lang] > span',
+      'div[dir="auto"] span'
+    ];
+    for (const selector of textSelectors) {
+      const el = tweetElement.querySelector(selector);
+      if (el?.textContent) {
+        tweetText = el.textContent;
+        break;
+      }
+    }
 
     // Get media URLs (images, videos)
     const mediaUrls = [];
-    const mediaElements = tweetElement.querySelectorAll('[data-testid="tweetPhoto"] img, video source');
-    mediaElements.forEach(el => {
-      const src = el.src || el.getAttribute('src');
-      if (src) mediaUrls.push(src);
+    const mediaSelectors = [
+      '[data-testid="tweetPhoto"] img',
+      'img[src*="pbs.twimg.com"]',
+      'video source',
+      '[data-testid="videoPlayer"] video'
+    ];
+    mediaSelectors.forEach(selector => {
+      tweetElement.querySelectorAll(selector).forEach(el => {
+        const src = el.src || el.getAttribute('src');
+        if (src && !mediaUrls.includes(src)) mediaUrls.push(src);
+      });
     });
+
+    log('Extracted tweet:', { tweetId, authorHandle, authorName, textLength: tweetText.length });
 
     return {
       tweetId,
@@ -45,7 +96,7 @@ function extractTweetData(tweetElement) {
       mediaUrls
     };
   } catch (error) {
-    console.error('Error extracting tweet data:', error);
+    console.error('[DD Bookmarks] Error extracting tweet data:', error);
     return null;
   }
 }
@@ -54,8 +105,13 @@ function extractTweetData(tweetElement) {
 function findTweetElement(element) {
   let current = element;
   while (current && current !== document.body) {
-    if (current.tagName === 'ARTICLE' && current.getAttribute('data-testid') === 'tweet') {
-      return current;
+    // Try multiple ways to identify a tweet container
+    if (current.tagName === 'ARTICLE') {
+      if (current.getAttribute('data-testid') === 'tweet' ||
+          current.getAttribute('role') === 'article' ||
+          current.querySelector('a[href*="/status/"]')) {
+        return current;
+      }
     }
     current = current.parentElement;
   }
@@ -66,20 +122,32 @@ function findTweetElement(element) {
 function handleBookmarkClick(event) {
   const target = event.target;
 
-  // Check if this is a bookmark button or its child
+  // Check if this is a bookmark button or its child - try multiple selectors
   const bookmarkButton = target.closest('[data-testid="bookmark"]') ||
-                         target.closest('[data-testid="removeBookmark"]');
+                         target.closest('[data-testid="removeBookmark"]') ||
+                         target.closest('[aria-label*="Bookmark"]') ||
+                         target.closest('[aria-label*="bookmark"]') ||
+                         target.closest('button[data-testid*="bookmark"]');
 
   if (!bookmarkButton) return;
 
+  log('Bookmark button clicked!', bookmarkButton);
+
   // Find the tweet element
   const tweetElement = findTweetElement(bookmarkButton);
-  if (!tweetElement) return;
+  if (!tweetElement) {
+    log('Could not find parent tweet element');
+    return;
+  }
 
   // Small delay to let the bookmark state change
   setTimeout(() => {
-    // Check if it's now bookmarked (has removeBookmark testid)
-    const isBookmarked = tweetElement.querySelector('[data-testid="removeBookmark"]');
+    // Check if it's now bookmarked - try multiple indicators
+    const isBookmarked = tweetElement.querySelector('[data-testid="removeBookmark"]') ||
+                         tweetElement.querySelector('[aria-label*="Remove from Bookmarks"]') ||
+                         bookmarkButton.getAttribute('data-testid') === 'removeBookmark';
+
+    log('Bookmark state after click:', { isBookmarked: !!isBookmarked });
 
     if (isBookmarked) {
       const tweetData = extractTweetData(tweetElement);
@@ -90,19 +158,40 @@ function handleBookmarkClick(event) {
         chrome.runtime.sendMessage({
           type: 'BOOKMARK_DETECTED',
           bookmark: tweetData
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            log('Error sending to background:', chrome.runtime.lastError);
+          } else {
+            log('Sent to background, response:', response);
+          }
         });
 
-        console.log('Bookmark detected:', tweetData.tweetId);
+        log('Bookmark detected and sent:', tweetData.tweetId);
       }
     }
-  }, 100);
+  }, 200);
 }
 
 // Scan bookmarks page for all bookmarked tweets
 function scanBookmarksPage() {
-  if (!window.location.pathname.includes('/i/bookmarks')) return;
+  if (!window.location.pathname.includes('/i/bookmarks')) {
+    log('Not on bookmarks page, skipping scan');
+    return;
+  }
 
-  const tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  log('Scanning bookmarks page...');
+
+  // Try multiple selectors to find tweets
+  let tweets = document.querySelectorAll('article[data-testid="tweet"]');
+  if (tweets.length === 0) {
+    tweets = document.querySelectorAll('article[role="article"]');
+  }
+  if (tweets.length === 0) {
+    tweets = document.querySelectorAll('article');
+  }
+
+  log('Found', tweets.length, 'potential tweet elements');
+
   const bookmarks = [];
 
   tweets.forEach(tweetElement => {
@@ -117,8 +206,16 @@ function scanBookmarksPage() {
     chrome.runtime.sendMessage({
       type: 'BOOKMARKS_BATCH',
       bookmarks
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        log('Error sending batch:', chrome.runtime.lastError);
+      } else {
+        log('Batch sent, response:', response);
+      }
     });
-    console.log('Scanned', bookmarks.length, 'bookmarks from page');
+    log('Scanned and sent', bookmarks.length, 'bookmarks from page');
+  } else {
+    log('No bookmarks extracted from page');
   }
 }
 
@@ -155,16 +252,27 @@ function observeBookmarksPage() {
 
 // Initialize
 function init() {
-  // Listen for bookmark button clicks
+  log('Initializing content script on:', window.location.href);
+
+  // Listen for bookmark button clicks on the entire document
   document.addEventListener('click', handleBookmarkClick, true);
+
+  // Also listen on capture phase to catch early
+  document.addEventListener('mousedown', (e) => {
+    const btn = e.target.closest('[data-testid="bookmark"], [data-testid="removeBookmark"]');
+    if (btn) {
+      log('Mousedown on bookmark button detected');
+    }
+  }, true);
 
   // If on bookmarks page, scan existing bookmarks
   if (window.location.pathname.includes('/i/bookmarks')) {
+    log('On bookmarks page, will scan after delay');
     // Wait for page to load
     setTimeout(() => {
       scanBookmarksPage();
       observeBookmarksPage();
-    }, 2000);
+    }, 3000);
   }
 
   // Listen for navigation changes (X uses client-side routing)
@@ -172,17 +280,29 @@ function init() {
   new MutationObserver(() => {
     const url = location.href;
     if (url !== lastUrl) {
+      log('URL changed from', lastUrl, 'to', url);
       lastUrl = url;
       if (url.includes('/i/bookmarks')) {
+        log('Navigated to bookmarks page');
         setTimeout(() => {
           scanBookmarksPage();
           observeBookmarksPage();
-        }, 2000);
+        }, 3000);
       }
     }
   }).observe(document, { subtree: true, childList: true });
 
-  console.log('Daily Dashboard X Bookmarks content script initialized');
+  // Log that we're active
+  log('Content script initialized and listening');
+
+  // Also check if extension can communicate with background
+  chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (response) => {
+    if (chrome.runtime.lastError) {
+      log('Cannot communicate with background script:', chrome.runtime.lastError);
+    } else {
+      log('Background script status:', response);
+    }
+  });
 }
 
 // Start

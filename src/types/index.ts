@@ -172,6 +172,7 @@ export interface Bookmark {
   url: string;
   savedAt: string;
   source?: 'readwise' | 'extension';
+  summary?: string;
 }
 
 export interface Todo {
@@ -181,6 +182,7 @@ export interface Todo {
   completed: boolean;
   completedAt: string | null;
   createdAt: string;
+  project: string | null;
 }
 
 export interface ApiKey {
@@ -199,6 +201,23 @@ export interface ExtensionBookmark {
   tweet_text: string;
   media_urls: string[];
   bookmarked_at: string;
+}
+
+export interface Link {
+  id: string;
+  url: string;
+  title: string | null;
+  summary: string | null;
+  savedAt: string;
+  archivedAt: string | null;
+}
+
+export interface Idea {
+  id: string;
+  text: string;
+  category: string | null;
+  archivedAt: string | null;
+  createdAt: string;
 }
 
 // Weekly Reflection (AI-generated)

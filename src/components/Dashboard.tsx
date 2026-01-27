@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { format } from 'date-fns';
-import { Settings, Sparkles, Bot, LogOut, Menu, X } from 'lucide-react';
+import { Settings, Sparkles, Bot, LogOut, Menu, X, Sun, Moon, Monitor } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
 import { useAutoSync } from '../hooks/useAutoSync';
+import { useTheme } from '../hooks/useTheme';
 import { TodayHeader } from './TodayHeader';
 import { FocusLineInput } from './FocusLineInput';
+import { RandomQuote } from './RandomQuote';
 import { CalendarWidget } from './CalendarWidget';
 import { HabitsWidget } from './HabitsWidget';
 import { JournalWidget } from './JournalWidget';
 import { DailyBriefWidget } from './DailyBriefWidget';
 import { BookmarksWidget } from './BookmarksWidget';
+import { LinksWidget } from './LinksWidget';
+import { IdeasWidget } from './IdeasWidget';
 import { TodosWidget } from './TodosWidget';
 import { SettingsPanel } from './SettingsPanel';
 import { JournalEditor } from './JournalEditor';
@@ -34,11 +38,16 @@ export function Dashboard() {
   } = useDashboardStore();
 
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [reflectionPanelOpen, setReflectionPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Auto-sync data when changes occur
   useAutoSync();
+
+  // Get the appropriate theme icon
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
+  const themeLabel = theme === 'light' ? 'Light mode' : theme === 'dark' ? 'Dark mode' : 'Auto';
 
   // Initialize with sample data if empty
   useEffect(() => {
@@ -88,6 +97,14 @@ export function Dashboard() {
                 </span>
               )}
               <button
+                onClick={toggleTheme}
+                className="btn-ghost p-2 rounded-lg relative"
+                aria-label={themeLabel}
+                title={themeLabel}
+              >
+                <ThemeIcon className="w-5 h-5" />
+              </button>
+              <button
                 onClick={() => setReflectionPanelOpen(true)}
                 className="btn-ghost p-2 rounded-lg relative"
                 aria-label="Weekly Reflection"
@@ -133,6 +150,15 @@ export function Dashboard() {
                 )}
                 <button
                   onClick={() => {
+                    toggleTheme();
+                  }}
+                  className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-left hover:bg-warm-gray/50"
+                >
+                  <ThemeIcon className="w-5 h-5 text-ink-muted" />
+                  <span className="font-ui text-sm">{themeLabel}</span>
+                </button>
+                <button
+                  onClick={() => {
                     setReflectionPanelOpen(true);
                     setMobileMenuOpen(false);
                   }}
@@ -171,6 +197,7 @@ export function Dashboard() {
           <div className="stagger-children">
             <TodayHeader />
             <FocusLineInput />
+            <RandomQuote />
           </div>
 
           {/* Dashboard Grid */}
@@ -186,6 +213,8 @@ export function Dashboard() {
             <div className="lg:col-span-5 space-y-6 stagger-children">
               <CalendarWidget />
               <DailyBriefWidget />
+              <IdeasWidget />
+              <LinksWidget />
               <BookmarksWidget />
             </div>
           </div>

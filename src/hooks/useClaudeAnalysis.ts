@@ -69,19 +69,85 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
   }, [isConfigured, journalEntries, getHabitsWithStats]);
 
   const generateDailyBrief = useCallback(async (): Promise<DailyBrief | null> => {
-    if (!isConfigured) {
-      setError('Anthropic API key not configured');
-      return null;
-    }
-
     setIsGeneratingBrief(true);
     setError(null);
 
     try {
-      const brief = await anthropicService.generateDailyBrief(
-        interestAreas,
-        settings.dailyBriefLength
-      );
+      let brief: DailyBrief;
+
+      // Helper to group items by topic
+      const groupByTopic = (items: any[], topicList: string[]) => {
+        const grouped: Record<string, any[]> = {};
+        for (const topic of topicList) {
+          grouped[topic] = items.filter((item: any) => item.topic === topic);
+        }
+        return grouped;
+      };
+
+      // Check if Perplexity API key is configured for real news
+      if (settings.perplexityApiKey) {
+        console.log('Fetching from Perplexity...');
+        const perplexityResponse = await fetch('/.netlify/functions/perplexity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            interests: interestAreas.filter(i => i.enabled),
+            briefLength: settings.dailyBriefLength,
+            apiKey: settings.perplexityApiKey
+          })
+        });
+
+        if (!perplexityResponse.ok) {
+          const errorText = await perplexityResponse.text();
+          console.error('Perplexity error:', perplexityResponse.status, errorText);
+          let errorMsg = 'Failed to fetch news from Perplexity';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMsg = errorJson.error || errorMsg;
+          } catch {
+            // Use default message
+          }
+          throw new Error(errorMsg);
+        }
+
+        const perplexityData = await perplexityResponse.json();
+        const articles = perplexityData.articles || [];
+        const topics = perplexityData.topics || [];
+
+        if (articles.length > 0) {
+          // Use Perplexity articles directly (no bulk Claude enhancement)
+          // Users can enhance individual items on-demand
+          const items = articles.map((a: any, i: number) => ({
+            id: `brief-${Date.now()}-${i}`,
+            title: a.title,
+            summary: a.summary,
+            source: a.source,
+            sourceUrl: a.sourceUrl,
+            topic: a.topic,
+            fetchedAt: new Date().toISOString()
+          }));
+          brief = {
+            date: new Date().toISOString().split('T')[0],
+            items,
+            itemsByTopic: groupByTopic(items, topics),
+            topics,
+            followUpQuestions: [],
+            generatedAt: new Date().toISOString()
+          };
+        } else {
+          // Perplexity returned no articles, fall back to Claude-only
+          brief = await anthropicService.generateDailyBrief(
+            interestAreas,
+            settings.dailyBriefLength
+          );
+        }
+      } else {
+        // No Perplexity key, use Claude-only (simulated news)
+        brief = await anthropicService.generateDailyBrief(
+          interestAreas,
+          settings.dailyBriefLength
+        );
+      }
 
       setDailyBrief(brief);
       return brief;
@@ -92,7 +158,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingBrief(false);
     }
-  }, [isConfigured, interestAreas, settings.dailyBriefLength, setDailyBrief]);
+  }, [interestAreas, settings.dailyBriefLength, settings.perplexityApiKey, setDailyBrief]);
 
   const generateContextualPrompt = useCallback(async (): Promise<string | null> => {
     if (!isConfigured) {
