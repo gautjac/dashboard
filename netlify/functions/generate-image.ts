@@ -46,7 +46,7 @@ export default async function handler(req: Request, _context: Context) {
       },
       body: JSON.stringify({
         prompt: prompt,
-        image_size: 'square', // square for header display
+        image_size: 'landscape_16_9', // wide panoramic for header banner
         num_inference_steps: modelConfig.steps,
         num_images: 1,
         enable_safety_checker: true,

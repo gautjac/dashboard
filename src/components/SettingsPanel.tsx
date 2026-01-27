@@ -410,7 +410,7 @@ export function SettingsPanel() {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.2 }}
-        className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden w-[95vw] sm:w-[90vw] max-w-[768px] h-[90vh] sm:h-auto sm:max-h-[85vh]"
+        className="relative bg-cream rounded-2xl shadow-lifted overflow-hidden w-[95vw] sm:w-[90vw] max-w-[768px] h-[85vh] max-h-[700px]"
       >
         <div className="flex flex-col sm:flex-row h-full">
           {/* Mobile Header */}

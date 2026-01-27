@@ -14,7 +14,7 @@ const FAL_MODELS = [
 ];
 
 export function TodayHeader() {
-  const { settings, dailyImage, setDailyImage, getTodayImage } = useDashboardStore();
+  const { settings, setDailyImage, getTodayImage } = useDashboardStore();
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux-schnell');
@@ -94,8 +94,45 @@ export function TodayHeader() {
       transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
       className="mb-6"
     >
+      {/* Banner Image */}
+      {todayImage ? (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative mb-6 rounded-xl overflow-hidden group"
+        >
+          <img
+            src={todayImage.imageUrl}
+            alt={todayImage.prompt}
+            className="w-full h-40 sm:h-52 object-cover"
+          />
+          {/* Gradient overlay for readability */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+          {/* Regenerate button on hover */}
+          {hasFalKey && (
+            <button
+              onClick={() => setShowPromptModal(true)}
+              className="absolute top-3 right-3 p-2 rounded-lg bg-black/40 hover:bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Generate new image"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          )}
+        </motion.div>
+      ) : hasFalKey ? (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          onClick={() => setShowPromptModal(true)}
+          className="w-full mb-6 h-32 rounded-xl border-2 border-dashed border-warm-gray-dark hover:border-terracotta bg-cream/50 hover:bg-terracotta-light/10 flex items-center justify-center gap-3 transition-colors"
+        >
+          <ImagePlus className="w-6 h-6 text-ink-muted" />
+          <span className="font-ui text-sm text-ink-muted">Generate a header image for today</span>
+        </motion.button>
+      ) : null}
+
+      {/* Date and Greeting */}
       <div className="flex items-start justify-between gap-4">
-        {/* Left side: Date and greeting */}
         <div className="flex-1">
           <motion.p
             initial={{ opacity: 0 }}
@@ -113,70 +150,32 @@ export function TodayHeader() {
           >
             {dateFormatted}
           </motion.h1>
-          <motion.div
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.4 }}
-            className="flex items-center gap-3 mt-2"
+            className="font-body text-lg text-ink-light mt-2"
           >
-            <p className="font-body text-lg text-ink-light">
-              {getGreeting()}
-            </p>
-            <div className="flex items-center gap-1.5 text-ink-muted">
-              <TimeIcon />
-              <span className="font-ui text-sm">
-                {format(now, 'h:mm a')}
-              </span>
-            </div>
-          </motion.div>
+            {getGreeting()}
+          </motion.p>
         </div>
 
-        {/* Right side: Generated image or prompt button */}
+        {/* Time display */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3, duration: 0.4 }}
-          className="flex-shrink-0"
+          className="flex items-center gap-3 p-3 bg-cream rounded-xl border border-warm-gray/50"
         >
-          {todayImage ? (
-            <div className="relative group">
-              <img
-                src={todayImage.imageUrl}
-                alt={todayImage.prompt}
-                className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl object-cover border border-warm-gray/50 shadow-sm"
-              />
-              {/* Regenerate button on hover */}
-              {hasFalKey && (
-                <button
-                  onClick={() => setShowPromptModal(true)}
-                  className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Generate new image"
-                >
-                  <Sparkles className="w-6 h-6 text-white" />
-                </button>
-              )}
-            </div>
-          ) : hasFalKey ? (
-            <button
-              onClick={() => setShowPromptModal(true)}
-              className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl border-2 border-dashed border-warm-gray-dark hover:border-terracotta bg-cream hover:bg-terracotta-light/10 flex flex-col items-center justify-center gap-2 transition-colors"
-            >
-              <ImagePlus className="w-8 h-8 text-ink-muted" />
-              <span className="font-ui text-xs text-ink-muted">Generate image</span>
-            </button>
-          ) : (
-            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-xl bg-cream border border-warm-gray/50 flex items-center justify-center">
-              <div className="text-center p-3">
-                <TimeIcon />
-                <p className="font-ui text-2xl font-semibold text-ink mt-2">
-                  {format(now, 'h:mm')}
-                </p>
-                <p className="font-ui text-xs text-ink-muted uppercase">
-                  {format(now, 'a')}
-                </p>
-              </div>
-            </div>
-          )}
+          <TimeIcon />
+          <div className="text-right">
+            <p className="font-ui text-2xl font-semibold text-ink">
+              {format(now, 'h:mm')}
+            </p>
+            <p className="font-ui text-xs text-ink-muted uppercase">
+              {format(now, 'a')}
+            </p>
+          </div>
         </motion.div>
       </div>
 
@@ -207,7 +206,7 @@ export function TodayHeader() {
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display text-lg font-semibold text-ink">
-                  Generate Daily Image
+                  Generate Header Image
                 </h3>
                 <button
                   onClick={() => !isGenerating && setShowPromptModal(false)}
@@ -219,13 +218,13 @@ export function TodayHeader() {
               </div>
 
               <p className="font-ui text-sm text-ink-muted mb-4">
-                Describe the image you'd like to generate for today's dashboard.
+                Describe the panoramic image you'd like for today's header.
               </p>
 
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="A serene mountain landscape at sunrise with soft pastel colors..."
+                placeholder="A serene mountain landscape at sunrise with soft pastel colors and misty valleys..."
                 className="w-full h-24 px-3 py-2 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-lg resize-none focus:outline-none focus:border-terracotta placeholder:text-ink-faint"
                 disabled={isGenerating}
               />
@@ -251,7 +250,7 @@ export function TodayHeader() {
               </div>
 
               {error && (
-                <p className="mt-2 text-sm text-red-500 font-ui">{error}</p>
+                <p className="mt-3 text-sm text-red-500 font-ui">{error}</p>
               )}
 
               <div className="flex justify-end gap-2 mt-4">
