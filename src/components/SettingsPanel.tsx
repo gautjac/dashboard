@@ -1297,6 +1297,45 @@ export function SettingsPanel() {
                     </div>
                   </div>
                 </div>
+
+                {/* FAL.ai Image Generation */}
+                <div className="border-t border-warm-gray/50 pt-6">
+                  <h4 className="font-ui text-sm font-medium text-ink mb-4">
+                    Image Generation
+                  </h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="font-ui text-sm font-medium text-ink block">
+                        FAL.ai API Key
+                      </label>
+                      <p className="font-ui text-xs text-ink-muted mt-1 mb-3">
+                        Generate AI images for your daily dashboard.
+                        Get your API key from{' '}
+                        <a
+                          href="https://fal.ai/dashboard/keys"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-terracotta hover:text-terracotta-dark"
+                        >
+                          fal.ai/dashboard/keys
+                        </a>
+                      </p>
+                      <input
+                        type="password"
+                        value={settings.falApiKey || ''}
+                        onChange={(e) => updateSettings({ falApiKey: e.target.value })}
+                        placeholder="Enter your FAL.ai API key"
+                        className="input w-full text-sm"
+                      />
+                      {settings.falApiKey && (
+                        <p className="font-ui text-xs text-sage-dark mt-2 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          API key configured
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -12,6 +12,7 @@ import type {
   CalendarAccount,
   InterestArea,
   DailyBrief,
+  DailyImage,
   UserSettings,
   WeeklyInsight,
   WeeklyReflection,
@@ -87,6 +88,11 @@ interface DashboardStore {
   addWeeklyReflection: (reflection: Omit<WeeklyReflection, 'id'>) => void;
   getWeeklyReflection: (weekStart: string) => WeeklyReflection | null;
   getAllWeeklyReflections: () => WeeklyReflection[];
+
+  // Daily Image Actions
+  dailyImage: DailyImage | null;
+  setDailyImage: (image: DailyImage) => void;
+  getTodayImage: () => DailyImage | null;
 
   // UI Actions
   setCurrentView: (view: DashboardStore['currentView']) => void;
@@ -189,6 +195,7 @@ export const useDashboardStore = create<DashboardStore>()(
       dailyBriefs: [],
       weeklyInsights: [],
       weeklyReflections: [],
+      dailyImage: null,
       settings: {
         theme: 'light',
         showWeather: false,
@@ -567,6 +574,16 @@ export const useDashboardStore = create<DashboardStore>()(
         );
       },
 
+      // Daily Image Actions
+      setDailyImage: (image) => set({ dailyImage: image }),
+
+      getTodayImage: () => {
+        const image = get().dailyImage;
+        if (!image) return null;
+        // Return image only if it's from today
+        return image.date === today() ? image : null;
+      },
+
       // UI Actions
       setCurrentView: (view) => set({ currentView: view }),
       setSelectedDate: (date) => set({ selectedDate: date }),
@@ -655,6 +672,7 @@ export const useDashboardStore = create<DashboardStore>()(
           dailyBriefs: [],
           weeklyInsights: [],
           weeklyReflections: [],
+          dailyImage: null,
           settings: {
             theme: 'light',
             showWeather: false,

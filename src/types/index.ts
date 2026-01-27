@@ -134,6 +134,15 @@ export interface UserSettings {
   dataExportFormat: 'json' | 'csv';
   perplexityApiKey?: string; // For real news in Daily Brief
   userName?: string; // For personalized greetings
+  falApiKey?: string; // For AI image generation
+}
+
+// Daily generated image
+export interface DailyImage {
+  date: string; // YYYY-MM-DD
+  imageUrl: string;
+  prompt: string;
+  generatedAt: string;
 }
 
 export interface WeeklyInsight {
