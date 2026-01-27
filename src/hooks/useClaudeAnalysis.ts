@@ -114,6 +114,8 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
         const articles = perplexityData.articles || [];
         const topics = perplexityData.topics || [];
 
+        console.log('Perplexity response:', { articleCount: articles.length, topics });
+
         if (articles.length > 0) {
           // Use Perplexity articles directly (no bulk Claude enhancement)
           // Users can enhance individual items on-demand
@@ -134,12 +136,15 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
             followUpQuestions: [],
             generatedAt: new Date().toISOString()
           };
-        } else {
-          // Perplexity returned no articles, fall back to Claude-only
+        } else if (isConfigured) {
+          // Perplexity returned no articles and Anthropic is configured, fall back to Claude-only
           brief = await anthropicService.generateDailyBrief(
             interestAreas,
             settings.dailyBriefLength
           );
+        } else {
+          // No articles from Perplexity and no Anthropic fallback
+          throw new Error('Perplexity returned no articles. Please check your interests configuration or try again later.');
         }
       } else {
         // No Perplexity key, use Claude-only (simulated news)
@@ -158,7 +163,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingBrief(false);
     }
-  }, [interestAreas, settings.dailyBriefLength, settings.perplexityApiKey, setDailyBrief]);
+  }, [interestAreas, settings.dailyBriefLength, settings.perplexityApiKey, setDailyBrief, isConfigured]);
 
   const generateContextualPrompt = useCallback(async (): Promise<string | null> => {
     if (!isConfigured) {
