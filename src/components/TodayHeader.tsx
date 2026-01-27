@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Sun, Cloud, Moon, ImagePlus, Loader2, X, Sparkles } from 'lucide-react';
+import { Sun, Cloud, Moon, ImagePlus, Loader2, X, Sparkles, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
+
+// Available FAL.ai models
+const FAL_MODELS = [
+  { id: 'flux-schnell', name: 'FLUX Schnell', description: 'Fast (~2s)' },
+  { id: 'flux-dev', name: 'FLUX Dev', description: 'Balanced (~10s)' },
+  { id: 'flux-pro', name: 'FLUX Pro', description: 'High quality (~15s)' },
+  { id: 'flux-pro-1.1', name: 'FLUX Pro 1.1', description: 'Best quality (~15s)' },
+];
 
 export function TodayHeader() {
   const { settings, dailyImage, setDailyImage, getTodayImage } = useDashboardStore();
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [selectedModel, setSelectedModel] = useState('flux-schnell');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +59,7 @@ export function TodayHeader() {
         body: JSON.stringify({
           prompt: prompt.trim(),
           apiKey: settings.falApiKey,
+          model: selectedModel,
         }),
       });
 
@@ -218,6 +228,26 @@ export function TodayHeader() {
                 className="w-full h-24 px-3 py-2 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-lg resize-none focus:outline-none focus:border-terracotta placeholder:text-ink-faint"
                 disabled={isGenerating}
               />
+
+              {/* Model selector */}
+              <div className="mt-3">
+                <label className="font-ui text-xs text-ink-muted block mb-1.5">Model</label>
+                <div className="relative">
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={isGenerating}
+                    className="w-full appearance-none px-3 py-2 pr-8 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-lg focus:outline-none focus:border-terracotta cursor-pointer"
+                  >
+                    {FAL_MODELS.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.name} - {model.description}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
+                </div>
+              </div>
 
               {error && (
                 <p className="mt-2 text-sm text-red-500 font-ui">{error}</p>

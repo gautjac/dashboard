@@ -1,11 +1,18 @@
 import type { Context } from '@netlify/functions';
 import { jsonResponse, errorResponse } from './utils/db';
 
-const FAL_API_URL = 'https://fal.run/fal-ai/flux/schnell';
+// Available FAL.ai models
+const FAL_MODELS: Record<string, { url: string; steps: number }> = {
+  'flux-schnell': { url: 'https://fal.run/fal-ai/flux/schnell', steps: 4 },
+  'flux-dev': { url: 'https://fal.run/fal-ai/flux/dev', steps: 28 },
+  'flux-pro': { url: 'https://fal.run/fal-ai/flux-pro', steps: 25 },
+  'flux-pro-1.1': { url: 'https://fal.run/fal-ai/flux-pro/v1.1', steps: 25 },
+};
 
 interface GenerateImageRequest {
   prompt: string;
   apiKey: string;
+  model?: string;
 }
 
 export default async function handler(req: Request, _context: Context) {
@@ -15,7 +22,7 @@ export default async function handler(req: Request, _context: Context) {
 
   try {
     const body = await req.json();
-    const { prompt, apiKey } = body as GenerateImageRequest;
+    const { prompt, apiKey, model = 'flux-schnell' } = body as GenerateImageRequest;
 
     if (!apiKey) {
       return errorResponse('FAL.ai API key is required', 400);
@@ -25,9 +32,12 @@ export default async function handler(req: Request, _context: Context) {
       return errorResponse('Prompt is required', 400);
     }
 
-    console.log('Generating image with prompt:', prompt.substring(0, 100));
+    // Get model config, default to flux-schnell
+    const modelConfig = FAL_MODELS[model] || FAL_MODELS['flux-schnell'];
 
-    const response = await fetch(FAL_API_URL, {
+    console.log('Generating image with model:', model, 'prompt:', prompt.substring(0, 100));
+
+    const response = await fetch(modelConfig.url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -36,7 +46,7 @@ export default async function handler(req: Request, _context: Context) {
       body: JSON.stringify({
         prompt: prompt,
         image_size: 'square', // square for header display
-        num_inference_steps: 4, // FLUX Schnell is optimized for 4 steps
+        num_inference_steps: modelConfig.steps,
         num_images: 1,
         enable_safety_checker: true,
       }),
