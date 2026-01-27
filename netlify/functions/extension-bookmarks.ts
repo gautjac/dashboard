@@ -60,10 +60,57 @@ async function fetchPageContent(url: string): Promise<{ title: string; content: 
   }
 }
 
-// Fetch content from X/Twitter post URL using oEmbed API
-async function fetchXPostContent(url: string): Promise<{ title: string; content: string } | null> {
+// Fetch content using Jina.ai reader API (handles JS-heavy sites)
+async function fetchWithJinaReader(url: string): Promise<{ title: string; content: string } | null> {
   try {
-    // Use Twitter's oEmbed API - this works without JavaScript and returns structured data
+    // Jina.ai reader API renders JavaScript and returns markdown
+    const jinaUrl = `https://r.jina.ai/${url}`;
+
+    console.log('Fetching with Jina reader:', url);
+
+    const response = await fetch(jinaUrl, {
+      headers: {
+        'Accept': 'text/plain',
+      },
+    });
+
+    if (!response.ok) {
+      console.log('Jina reader failed, status:', response.status);
+      return null;
+    }
+
+    const text = await response.text();
+
+    // Jina returns markdown with a Title: line at the top
+    const titleMatch = text.match(/^Title:\s*(.+)$/m);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+
+    // Remove the metadata header (Title:, URL:, etc.) and get the content
+    const contentStart = text.indexOf('\n\n');
+    const content = contentStart > 0 ? text.substring(contentStart + 2).trim() : text;
+
+    console.log('Jina reader content fetched:', {
+      title,
+      contentLength: content.length,
+      preview: content.substring(0, 150)
+    });
+
+    // Only return if we got meaningful content
+    if (content.length > 100) {
+      return { title, content: content.substring(0, 8000) };
+    }
+
+    return null;
+  } catch (err) {
+    console.error('Failed to fetch with Jina reader:', err);
+    return null;
+  }
+}
+
+// Fetch content from X/Twitter post URL - tries multiple methods
+async function fetchXPostContent(url: string): Promise<{ title: string; content: string } | null> {
+  // Method 1: Try oEmbed first (fast, works for regular tweets)
+  try {
     const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
 
     const response = await fetch(oembedUrl, {
@@ -72,49 +119,47 @@ async function fetchXPostContent(url: string): Promise<{ title: string; content:
       },
     });
 
-    if (!response.ok) {
-      console.log('oEmbed API failed, status:', response.status);
-      return null;
+    if (response.ok) {
+      const data = await response.json();
+      const html = data.html || '';
+      const authorName = data.author_name || '';
+
+      // Parse the blockquote content
+      const tweetTextMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      let tweetText = tweetTextMatch ? tweetTextMatch[1] : '';
+
+      // Clean up HTML entities and tags
+      tweetText = tweetText
+        .replace(/<a[^>]*>(.*?)<\/a>/gi, '$1')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+
+      console.log('oEmbed content fetched:', {
+        authorName,
+        tweetTextLength: tweetText.length,
+        preview: tweetText.substring(0, 100)
+      });
+
+      // If oEmbed returned decent content, use it
+      if (tweetText.length > 100) {
+        return { title: `Post by ${authorName}`, content: tweetText };
+      }
+
+      console.log('oEmbed content too short, trying Jina reader...');
     }
-
-    const data = await response.json();
-
-    // The html field contains the tweet in a blockquote format
-    // Extract the text content from it
-    const html = data.html || '';
-    const authorName = data.author_name || '';
-
-    // Parse the blockquote content - it contains the actual tweet text
-    // Format is usually: <blockquote>...<p>tweet text</p>...</blockquote>
-    const tweetTextMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-    let tweetText = tweetTextMatch ? tweetTextMatch[1] : '';
-
-    // Clean up HTML entities and tags
-    tweetText = tweetText
-      .replace(/<a[^>]*>(.*?)<\/a>/gi, '$1') // Keep link text
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&#39;/g, "'")
-      .replace(/&nbsp;/g, ' ')
-      .trim();
-
-    const title = `Post by ${authorName}`;
-
-    console.log('oEmbed content fetched:', {
-      authorName,
-      tweetTextLength: tweetText.length,
-      preview: tweetText.substring(0, 100)
-    });
-
-    return { title, content: tweetText };
   } catch (err) {
-    console.error('Failed to fetch X post via oEmbed:', err);
-    return null;
+    console.log('oEmbed failed, trying Jina reader...', err);
   }
+
+  // Method 2: Use Jina.ai reader as fallback (handles X Articles and JS-heavy content)
+  return await fetchWithJinaReader(url);
 }
 
 // Generate summary using Claude
