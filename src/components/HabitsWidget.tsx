@@ -145,7 +145,7 @@ function HabitItem({ habit, onToggle, onSetValue, onEdit }: HabitItemProps) {
                   onBlur={handleNumericSubmit}
                   onKeyDown={(e) => e.key === 'Enter' && handleNumericSubmit()}
                   placeholder="0"
-                  className="w-16 px-2 py-1 text-sm font-ui bg-white border border-warm-gray-dark rounded-md focus:outline-none focus:border-terracotta"
+                  className="w-16 px-2 py-1 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-md focus:outline-none focus:border-terracotta placeholder:text-ink-faint"
                 />
                 <span className="text-xs text-ink-muted font-ui">
                   / {habit.targetValue} {habit.targetUnit}
