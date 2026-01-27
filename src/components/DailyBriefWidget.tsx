@@ -199,12 +199,16 @@ function TopicSection({ topic, items, defaultExpanded = true }: TopicSectionProp
 }
 
 export function DailyBriefWidget() {
-  const { getTodayBrief, interestAreas } = useDashboardStore();
-  const { isConfigured, isGeneratingBrief, error, generateDailyBrief, clearError } = useClaudeAnalysis();
+  const { getTodayBrief, interestAreas, settings } = useDashboardStore();
+  const { isConfigured: isAnthropicConfigured, isGeneratingBrief, error, generateDailyBrief, clearError } = useClaudeAnalysis();
   const brief = getTodayBrief();
   const hasInterests = interestAreas.some(i => i.enabled);
   const [showQuestions, setShowQuestions] = useState(false);
   const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('daily-brief');
+
+  // Brief generation works with either Perplexity (for real news) or Anthropic (for simulated)
+  const hasPerplexityKey = Boolean(settings.perplexityApiKey);
+  const canGenerateBrief = hasPerplexityKey || isAnthropicConfigured;
 
   const handleGenerateBrief = async () => {
     clearError();
@@ -243,9 +247,9 @@ export function DailyBriefWidget() {
         <div className="flex items-center gap-1">
           <button
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink disabled:opacity-50"
-            title={isConfigured ? "Refresh brief" : "Configure API key in settings"}
+            title={canGenerateBrief ? "Refresh brief" : "Configure API key in settings"}
             onClick={handleGenerateBrief}
-            disabled={!isConfigured || isGeneratingBrief || !hasInterests}
+            disabled={!canGenerateBrief || isGeneratingBrief || !hasInterests}
           >
             <RefreshCw className={`w-4 h-4 ${isGeneratingBrief ? 'animate-spin' : ''}`} />
           </button>
@@ -321,14 +325,14 @@ export function DailyBriefWidget() {
                   Your daily brief awaits
                 </p>
                 <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-                  {isConfigured
+                  {canGenerateBrief
                     ? "Generate a personalized brief based on your interests"
-                    : "Configure your Anthropic API key in settings to generate briefs"}
+                    : "Configure your Perplexity API key in settings to generate briefs"}
                 </p>
                 <button
                   className="btn btn-primary text-sm"
                   onClick={handleGenerateBrief}
-                  disabled={!isConfigured}
+                  disabled={!canGenerateBrief}
                 >
                   <Sparkles className="w-4 h-4" />
                   Generate Brief
