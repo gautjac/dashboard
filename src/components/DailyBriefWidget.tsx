@@ -210,6 +210,15 @@ export function DailyBriefWidget() {
   const hasPerplexityKey = Boolean(settings.perplexityApiKey);
   const canGenerateBrief = hasPerplexityKey || isAnthropicConfigured;
 
+  // Debug logging
+  console.log('DailyBrief settings check:', {
+    hasPerplexityKey,
+    perplexityKeyLength: settings.perplexityApiKey?.length || 0,
+    isAnthropicConfigured,
+    canGenerateBrief,
+    hasInterests
+  });
+
   const handleGenerateBrief = async () => {
     clearError();
     await generateDailyBrief();
