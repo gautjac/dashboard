@@ -6,23 +6,33 @@ interface UseArticleEnhancementReturn {
   enhanceArticle: (article: DailyBriefItem) => Promise<string | null>;
   isEnhancing: boolean;
   error: string | null;
+  isConfigured: boolean;
 }
 
 export function useArticleEnhancement(): UseArticleEnhancementReturn {
-  const { interestAreas, updateBriefItemInsight } = useDashboardStore();
+  const { interestAreas, updateBriefItemInsight, settings } = useDashboardStore();
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if Perplexity API key is configured
+  const isConfigured = Boolean(settings.perplexityApiKey);
+
   const enhanceArticle = useCallback(async (article: DailyBriefItem): Promise<string | null> => {
+    if (!settings.perplexityApiKey) {
+      setError('Perplexity API key not configured');
+      return null;
+    }
+
     setIsEnhancing(true);
     setError(null);
 
     try {
-      const response = await fetch('/.netlify/functions/anthropic', {
+      const response = await fetch('/.netlify/functions/perplexity', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'enhanceSingleItem',
+          action: 'enhanceArticle',
+          apiKey: settings.perplexityApiKey,
           article: {
             title: article.title,
             summary: article.summary,
@@ -54,11 +64,12 @@ export function useArticleEnhancement(): UseArticleEnhancementReturn {
     } finally {
       setIsEnhancing(false);
     }
-  }, [interestAreas, updateBriefItemInsight]);
+  }, [interestAreas, updateBriefItemInsight, settings.perplexityApiKey]);
 
   return {
     enhanceArticle,
     isEnhancing,
-    error
+    error,
+    isConfigured
   };
 }

@@ -4,9 +4,16 @@ import { jsonResponse, errorResponse } from './utils/db';
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
 
 interface PerplexityRequest {
+  action?: 'generateBrief' | 'enhanceArticle';
   interests: { name: string; keywords: string[] }[];
   briefLength: 'short' | 'medium' | 'long';
   apiKey: string;
+  article?: {
+    title: string;
+    summary: string;
+    source: string;
+    topic: string;
+  };
 }
 
 export default async function handler(req: Request, _context: Context) {
@@ -18,7 +25,7 @@ export default async function handler(req: Request, _context: Context) {
     console.log('Perplexity function started');
     const body = await req.json();
     console.log('Request body parsed');
-    const { interests, briefLength, apiKey } = body as PerplexityRequest;
+    const { action, interests, briefLength, apiKey, article } = body as PerplexityRequest;
 
     if (!apiKey) {
       return errorResponse('Perplexity API key is required', 400);
@@ -28,6 +35,57 @@ export default async function handler(req: Request, _context: Context) {
     const sanitizedApiKey = apiKey.replace(/[^\x00-\x7F]/g, '').trim();
     if (sanitizedApiKey.length !== apiKey.length) {
       console.log('API key sanitized - removed', apiKey.length - sanitizedApiKey.length, 'non-ASCII characters');
+    }
+
+    // Handle article enhancement action
+    if (action === 'enhanceArticle' && article) {
+      console.log('Enhancing article:', article.title);
+
+      const enabledInterests = interests?.filter(i => i.keywords && i.keywords.length > 0) || [];
+      const interestContext = enabledInterests.length > 0
+        ? `The user is interested in: ${enabledInterests.map(i => i.name).join(', ')}.`
+        : '';
+
+      const enhanceResponse = await fetch(PERPLEXITY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sanitizedApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'sonar',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a helpful analyst who explains why news articles matter to readers. ${interestContext} Be concise and insightful.`
+            },
+            {
+              role: 'user',
+              content: `For this article, explain in 2-3 sentences why it matters and what the implications are:
+
+Title: ${article.title}
+Summary: ${article.summary}
+Source: ${article.source}
+Topic: ${article.topic}
+
+Focus on practical implications, broader trends, or why someone interested in ${article.topic} should care about this.`
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 300
+        }),
+      });
+
+      if (!enhanceResponse.ok) {
+        const errorText = await enhanceResponse.text();
+        console.error('Perplexity enhance error:', enhanceResponse.status, errorText);
+        return errorResponse('Failed to generate insight', enhanceResponse.status);
+      }
+
+      const enhanceData = await enhanceResponse.json();
+      const insight = enhanceData.choices?.[0]?.message?.content || '';
+
+      return jsonResponse({ text: insight.trim() });
     }
 
     const enabledInterests = interests.filter(i => i.keywords && i.keywords.length > 0);

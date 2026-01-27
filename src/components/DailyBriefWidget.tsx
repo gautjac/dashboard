@@ -16,7 +16,6 @@ import { useDashboardStore } from '../store';
 import { useClaudeAnalysis, useArticleEnhancement } from '../hooks';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import type { DailyBriefItem } from '../types';
-import { anthropicService } from '../services/anthropic';
 
 interface BriefItemProps {
   item: DailyBriefItem;
@@ -25,8 +24,7 @@ interface BriefItemProps {
 
 function BriefItem({ item, index }: BriefItemProps) {
   const [expanded, setExpanded] = useState(false);
-  const { enhanceArticle, isEnhancing } = useArticleEnhancement();
-  const isConfigured = anthropicService.isConfigured();
+  const { enhanceArticle, isEnhancing, isConfigured } = useArticleEnhancement();
 
   const handleEnhance = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -209,15 +207,6 @@ export function DailyBriefWidget() {
   // Brief generation works with either Perplexity (for real news) or Anthropic (for simulated)
   const hasPerplexityKey = Boolean(settings.perplexityApiKey);
   const canGenerateBrief = hasPerplexityKey || isAnthropicConfigured;
-
-  // Debug logging
-  console.log('DailyBrief settings check:', {
-    hasPerplexityKey,
-    perplexityKeyLength: settings.perplexityApiKey?.length || 0,
-    isAnthropicConfigured,
-    canGenerateBrief,
-    hasInterests
-  });
 
   const handleGenerateBrief = async () => {
     clearError();
