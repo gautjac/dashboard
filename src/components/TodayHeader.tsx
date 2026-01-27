@@ -10,6 +10,7 @@ const FAL_MODELS = [
   { id: 'flux-dev', name: 'FLUX Dev', description: 'Balanced (~10s)' },
   { id: 'flux-pro', name: 'FLUX Pro', description: 'High quality (~15s)' },
   { id: 'flux-pro-1.1', name: 'FLUX Pro 1.1', description: 'Best quality (~15s)' },
+  { id: 'nana-banana-pro', name: 'Nana Banana Pro', description: 'Creative (~10s)' },
 ];
 
 export function TodayHeader() {

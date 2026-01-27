@@ -7,6 +7,7 @@ const FAL_MODELS: Record<string, { url: string; steps: number }> = {
   'flux-dev': { url: 'https://fal.run/fal-ai/flux/dev', steps: 28 },
   'flux-pro': { url: 'https://fal.run/fal-ai/flux-pro', steps: 25 },
   'flux-pro-1.1': { url: 'https://fal.run/fal-ai/flux-pro/v1.1', steps: 25 },
+  'nana-banana-pro': { url: 'https://fal.run/fal-ai/nana-banana/pro', steps: 30 },
 };
 
 interface GenerateImageRequest {
