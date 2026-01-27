@@ -1,8 +1,10 @@
 import { format } from 'date-fns';
 import { Sun, Cloud, Moon } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useDashboardStore } from '../store';
 
 export function TodayHeader() {
+  const { settings } = useDashboardStore();
   const now = new Date();
   const hour = now.getHours();
   const dayOfWeek = format(now, 'EEEE');
@@ -10,10 +12,11 @@ export function TodayHeader() {
 
   // Determine greeting based on time of day
   const getGreeting = () => {
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    if (hour < 21) return 'Good evening';
-    return 'Good night';
+    const name = settings.userName ? `, ${settings.userName}` : '';
+    if (hour < 12) return `Good morning${name}`;
+    if (hour < 17) return `Good afternoon${name}`;
+    if (hour < 21) return `Good evening${name}`;
+    return `Good night${name}`;
   };
 
   // Determine icon based on time of day

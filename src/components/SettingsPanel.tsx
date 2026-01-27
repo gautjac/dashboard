@@ -490,6 +490,23 @@ export function SettingsPanel() {
           <div className="flex-1 overflow-y-auto p-4 sm:p-6">
             {activeTab === 'general' && (
               <div className="space-y-6">
+                {/* Name */}
+                <div>
+                  <label className="font-ui text-sm font-medium text-ink block mb-2">
+                    Your Name
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.userName || ''}
+                    onChange={(e) => updateSettings({ userName: e.target.value })}
+                    placeholder="Enter your name"
+                    className="input w-full text-sm"
+                  />
+                  <p className="font-ui text-xs text-ink-muted mt-2">
+                    Used for personalized greetings
+                  </p>
+                </div>
+
                 {/* Theme */}
                 <div>
                   <label className="font-ui text-sm font-medium text-ink block mb-2">

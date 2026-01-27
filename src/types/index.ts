@@ -133,6 +133,7 @@ export interface UserSettings {
   aiAnalysisEnabled: boolean;
   dataExportFormat: 'json' | 'csv';
   perplexityApiKey?: string; // For real news in Daily Brief
+  userName?: string; // For personalized greetings
 }
 
 export interface WeeklyInsight {
