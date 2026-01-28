@@ -38,6 +38,9 @@ function mapSettingsFromDb(row: any) {
     computerAccessEnabled: row.computer_access_enabled ?? false,
     aiAnalysisEnabled: row.ai_analysis_enabled ?? true,
     dataExportFormat: row.data_export_format || 'json',
+    userName: row.user_name || undefined,
+    perplexityApiKey: row.perplexity_api_key || undefined,
+    falApiKey: row.fal_api_key || undefined,
   };
 }
 
@@ -98,6 +101,9 @@ export default async function handler(req: Request, _context: Context) {
           computerAccessEnabled,
           aiAnalysisEnabled,
           dataExportFormat,
+          userName,
+          perplexityApiKey,
+          falApiKey,
         } = body;
 
         // Update settings with COALESCE to preserve unset values
@@ -114,6 +120,9 @@ export default async function handler(req: Request, _context: Context) {
             computer_access_enabled = COALESCE(${computerAccessEnabled}, computer_access_enabled),
             ai_analysis_enabled = COALESCE(${aiAnalysisEnabled}, ai_analysis_enabled),
             data_export_format = COALESCE(${dataExportFormat}, data_export_format),
+            user_name = COALESCE(${userName}, user_name),
+            perplexity_api_key = COALESCE(${perplexityApiKey}, perplexity_api_key),
+            fal_api_key = COALESCE(${falApiKey}, fal_api_key),
             updated_at = NOW()
           WHERE user_id = ${normalizedUserId}
           RETURNING *
