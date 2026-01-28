@@ -45,7 +45,7 @@ export default async function handler(req: Request, _context: Context) {
 
     const requestBody = {
       prompt: prompt.trim(),
-      image_size: { width: 2100, height: 900 }, // 21:9 ultra-wide banner
+      image_size: { width: 2048, height: 896 }, // ~21:9 ultra-wide banner (dimensions divisible by 64)
       num_inference_steps: modelConfig.steps,
       num_images: 1,
       enable_safety_checker: true,
