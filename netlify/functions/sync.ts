@@ -50,6 +50,8 @@ interface SyncPayload {
     weatherLocation?: string;
     dailyBriefLength: string;
     journalPromptStyle: string;
+    journalPromptInstructions?: Record<string, string>;
+    customJournalPrompts?: string[];
     computerAccessEnabled: boolean;
     aiAnalysisEnabled: boolean;
     dataExportFormat: string;
@@ -176,6 +178,8 @@ export const handler: Handler = async (event) => {
             weatherLocation: settings[0].weather_location,
             dailyBriefLength: settings[0].daily_brief_length,
             journalPromptStyle: settings[0].journal_prompt_style,
+            journalPromptInstructions: settings[0].journal_prompt_instructions || undefined,
+            customJournalPrompts: settings[0].custom_journal_prompts || undefined,
             computerAccessEnabled: settings[0].computer_access_enabled,
             aiAnalysisEnabled: settings[0].ai_analysis_enabled,
             dataExportFormat: settings[0].data_export_format,
@@ -306,14 +310,16 @@ export const handler: Handler = async (event) => {
       if (data.settings) {
         const s = data.settings;
         await sql`
-          INSERT INTO user_settings (user_id, theme, show_weather, weather_location, daily_brief_length, journal_prompt_style, computer_access_enabled, ai_analysis_enabled, data_export_format)
-          VALUES (${userId}, ${s.theme}, ${s.showWeather}, ${s.weatherLocation || null}, ${s.dailyBriefLength}, ${s.journalPromptStyle}, ${s.computerAccessEnabled}, ${s.aiAnalysisEnabled}, ${s.dataExportFormat})
+          INSERT INTO user_settings (user_id, theme, show_weather, weather_location, daily_brief_length, journal_prompt_style, journal_prompt_instructions, custom_journal_prompts, computer_access_enabled, ai_analysis_enabled, data_export_format)
+          VALUES (${userId}, ${s.theme}, ${s.showWeather}, ${s.weatherLocation || null}, ${s.dailyBriefLength}, ${s.journalPromptStyle}, ${s.journalPromptInstructions ? JSON.stringify(s.journalPromptInstructions) : null}, ${s.customJournalPrompts || null}, ${s.computerAccessEnabled}, ${s.aiAnalysisEnabled}, ${s.dataExportFormat})
           ON CONFLICT (user_id) DO UPDATE SET
             theme = EXCLUDED.theme,
             show_weather = EXCLUDED.show_weather,
             weather_location = EXCLUDED.weather_location,
             daily_brief_length = EXCLUDED.daily_brief_length,
             journal_prompt_style = EXCLUDED.journal_prompt_style,
+            journal_prompt_instructions = EXCLUDED.journal_prompt_instructions,
+            custom_journal_prompts = EXCLUDED.custom_journal_prompts,
             computer_access_enabled = EXCLUDED.computer_access_enabled,
             ai_analysis_enabled = EXCLUDED.ai_analysis_enabled,
             data_export_format = EXCLUDED.data_export_format,

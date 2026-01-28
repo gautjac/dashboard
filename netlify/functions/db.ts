@@ -273,6 +273,28 @@ export async function initializeSchema() {
     END $$;
   `;
 
+  // Add journal_prompt_instructions column to user_settings if it doesn't exist
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='user_settings' AND column_name='journal_prompt_instructions') THEN
+        ALTER TABLE user_settings ADD COLUMN journal_prompt_instructions JSONB;
+      END IF;
+    END $$;
+  `;
+
+  // Add custom_journal_prompts column to user_settings if it doesn't exist
+  await sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_name='user_settings' AND column_name='custom_journal_prompts') THEN
+        ALTER TABLE user_settings ADD COLUMN custom_journal_prompts TEXT[];
+      END IF;
+    END $$;
+  `;
+
   return { success: true };
 }
 
