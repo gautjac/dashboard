@@ -174,7 +174,7 @@ export interface JournalPrompt {
   contextual?: boolean; // Uses habits/calendar data
 }
 
-// X Bookmarks (via browser extension)
+// X Bookmarks (via iOS/macOS shortcuts or browser extension)
 export interface Bookmark {
   id: string;
   text: string;

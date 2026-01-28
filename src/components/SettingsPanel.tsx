@@ -302,7 +302,7 @@ export function SettingsPanel() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: 'Browser Extension' }),
+        body: JSON.stringify({ name: 'Shortcut' }),
       });
 
       if (response.ok) {
@@ -854,10 +854,10 @@ export function SettingsPanel() {
 
             {activeTab === 'bookmarks' && (
               <div className="space-y-6">
-                {/* Browser Extension Section */}
+                {/* Shortcuts & Extensions Section */}
                 <div>
                   <label className="font-ui text-sm font-medium text-ink block mb-3">
-                    X Bookmarks - Browser Extension
+                    X Bookmarks - Shortcuts & Extensions
                   </label>
 
                   <div className="space-y-4">
@@ -868,10 +868,10 @@ export function SettingsPanel() {
                         </div>
                         <div>
                           <p className="font-ui text-sm font-medium text-ink">
-                            Chrome Extension
+                            iOS & macOS Shortcuts
                           </p>
                           <p className="font-ui text-xs text-ink-muted">
-                            Instant sync when you bookmark on X
+                            Save bookmarks, links, and ideas via Share Sheet
                           </p>
                         </div>
                       </div>
@@ -918,7 +918,7 @@ export function SettingsPanel() {
                           {!syncEnabled && !apiKeyError && (
                             <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-200">
                               <p className="font-ui text-sm text-yellow-800 mb-2">
-                                Enable Sync first to generate API keys for the browser extension
+                                Enable Sync first to generate API keys for shortcuts
                               </p>
                               <button
                                 onClick={() => setActiveTab('sync')}
@@ -999,9 +999,9 @@ export function SettingsPanel() {
                       </p>
                       <ol className="font-ui text-xs text-ink-muted list-decimal list-inside space-y-1">
                         <li>Generate an API key above</li>
-                        <li>Install the Chrome extension (coming soon)</li>
-                        <li>Paste your API key in the extension settings</li>
-                        <li>Bookmarks will sync instantly when you use X</li>
+                        <li>Add the iOS/macOS Shortcut from the Shortcuts app</li>
+                        <li>Paste your API key when prompted</li>
+                        <li>Use the Share Sheet to save bookmarks, links, and ideas</li>
                       </ol>
                     </div>
                   </div>
