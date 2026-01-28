@@ -113,6 +113,18 @@ CREATE TABLE IF NOT EXISTS weekly_insights (
   UNIQUE(user_id, week_start)
 );
 
+-- Weekly reflections (AI-generated summaries)
+CREATE TABLE IF NOT EXISTS weekly_reflections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  week_start DATE NOT NULL,
+  week_end DATE NOT NULL,
+  reflection TEXT NOT NULL,
+  stats JSONB NOT NULL, -- {journalEntryCount, totalWords, avgMood, avgEnergy, avgHabitCompletion, topStreaks}
+  generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(user_id, week_start)
+);
+
 -- Calendar events (synced from Google, cached locally)
 CREATE TABLE IF NOT EXISTS calendar_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -151,6 +163,8 @@ CREATE INDEX IF NOT EXISTS idx_habit_completions_date ON habit_completions(compl
 CREATE INDEX IF NOT EXISTS idx_journal_entries_user_date ON journal_entries(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_focus_lines_user_date ON focus_lines(user_id, date);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_user_time ON calendar_events(user_id, start_time);
+CREATE INDEX IF NOT EXISTS idx_weekly_insights_user_week ON weekly_insights(user_id, week_start);
+CREATE INDEX IF NOT EXISTS idx_weekly_reflections_user_week ON weekly_reflections(user_id, week_start);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

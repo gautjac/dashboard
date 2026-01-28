@@ -61,6 +61,32 @@ interface SyncPayload {
     sources: string[];
     enabled: boolean;
   }>;
+  weeklyInsights?: Array<{
+    id: string;
+    weekStart: string;
+    themes: string[];
+    sentimentTrend: string;
+    topStressors: string[];
+    topEnergizers: string[];
+    habitCorrelations: unknown[];
+    summary: string;
+    generatedAt: string;
+  }>;
+  weeklyReflections?: Array<{
+    id: string;
+    weekStart: string;
+    weekEnd: string;
+    reflection: string;
+    stats: {
+      journalEntryCount: number;
+      totalWords: number;
+      avgMood: number | null;
+      avgEnergy: number | null;
+      avgHabitCompletion: number | null;
+      topStreaks: { habitName: string; streak: number }[];
+    };
+    generatedAt: string;
+  }>;
   lastSyncedAt?: string;
 }
 
@@ -88,13 +114,15 @@ export const handler: Handler = async (event) => {
       await sql`INSERT INTO users (id, email) VALUES (${userId}, ${userId}) ON CONFLICT (id) DO NOTHING`;
 
       // Fetch all data
-      const [habits, completions, journals, focusLines, settings, interests] = await Promise.all([
+      const [habits, completions, journals, focusLines, settings, interests, weeklyInsights, weeklyReflections] = await Promise.all([
         sql`SELECT * FROM habits WHERE user_id = ${userId} ORDER BY created_at`,
         sql`SELECT * FROM habit_completions WHERE user_id = ${userId} ORDER BY date DESC LIMIT 1000`,
         sql`SELECT * FROM journal_entries WHERE user_id = ${userId} ORDER BY date DESC LIMIT 365`,
         sql`SELECT * FROM focus_lines WHERE user_id = ${userId} ORDER BY date DESC LIMIT 30`,
         sql`SELECT * FROM user_settings WHERE user_id = ${userId}`,
         sql`SELECT * FROM interest_areas WHERE user_id = ${userId}`,
+        sql`SELECT * FROM weekly_insights WHERE user_id = ${userId} ORDER BY week_start DESC LIMIT 52`,
+        sql`SELECT * FROM weekly_reflections WHERE user_id = ${userId} ORDER BY week_start DESC LIMIT 52`,
       ]);
 
       return {
@@ -158,6 +186,25 @@ export const handler: Handler = async (event) => {
             keywords: i.keywords || [],
             sources: i.sources || [],
             enabled: i.enabled,
+          })),
+          weeklyInsights: weeklyInsights.map(w => ({
+            id: w.id,
+            weekStart: w.week_start,
+            themes: w.themes || [],
+            sentimentTrend: w.sentiment_trend,
+            topStressors: w.top_stressors || [],
+            topEnergizers: w.top_energizers || [],
+            habitCorrelations: w.habit_correlations || [],
+            summary: w.summary,
+            generatedAt: w.generated_at,
+          })),
+          weeklyReflections: weeklyReflections.map(r => ({
+            id: r.id,
+            weekStart: r.week_start,
+            weekEnd: r.week_end,
+            reflection: r.reflection,
+            stats: r.stats || {},
+            generatedAt: r.generated_at,
           })),
           syncedAt: new Date().toISOString(),
         }),
@@ -285,6 +332,39 @@ export const handler: Handler = async (event) => {
               keywords = EXCLUDED.keywords,
               sources = EXCLUDED.sources,
               enabled = EXCLUDED.enabled
+          `;
+        }
+      }
+
+      // Sync weekly insights
+      if (data.weeklyInsights) {
+        for (const insight of data.weeklyInsights) {
+          await sql`
+            INSERT INTO weekly_insights (id, user_id, week_start, themes, sentiment_trend, top_stressors, top_energizers, habit_correlations, summary, generated_at)
+            VALUES (${insight.id}, ${userId}, ${insight.weekStart}, ${insight.themes}, ${insight.sentimentTrend}, ${insight.topStressors}, ${insight.topEnergizers}, ${JSON.stringify(insight.habitCorrelations)}, ${insight.summary}, ${insight.generatedAt})
+            ON CONFLICT (user_id, week_start) DO UPDATE SET
+              themes = EXCLUDED.themes,
+              sentiment_trend = EXCLUDED.sentiment_trend,
+              top_stressors = EXCLUDED.top_stressors,
+              top_energizers = EXCLUDED.top_energizers,
+              habit_correlations = EXCLUDED.habit_correlations,
+              summary = EXCLUDED.summary,
+              generated_at = EXCLUDED.generated_at
+          `;
+        }
+      }
+
+      // Sync weekly reflections
+      if (data.weeklyReflections) {
+        for (const reflection of data.weeklyReflections) {
+          await sql`
+            INSERT INTO weekly_reflections (id, user_id, week_start, week_end, reflection, stats, generated_at)
+            VALUES (${reflection.id}, ${userId}, ${reflection.weekStart}, ${reflection.weekEnd}, ${reflection.reflection}, ${JSON.stringify(reflection.stats)}, ${reflection.generatedAt})
+            ON CONFLICT (user_id, week_start) DO UPDATE SET
+              week_end = EXCLUDED.week_end,
+              reflection = EXCLUDED.reflection,
+              stats = EXCLUDED.stats,
+              generated_at = EXCLUDED.generated_at
           `;
         }
       }

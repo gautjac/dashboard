@@ -813,6 +813,21 @@ html.dark .divider {
   }
 }
 
+/* Modal root - isolated rendering container */
+#modal-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  z-index: 9998;
+  pointer-events: none;
+}
+
+#modal-root > * {
+  pointer-events: auto;
+}
+
 /* Print styles */
 @media print {
   .no-print {

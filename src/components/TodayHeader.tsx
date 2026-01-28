@@ -1,16 +1,17 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import { Sun, Cloud, Moon, ImagePlus, Loader2, X, Sparkles, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
 
 // Available FAL.ai models
 const FAL_MODELS = [
   { id: 'flux-schnell', name: 'FLUX Schnell', description: 'Fast (~2s)' },
   { id: 'flux-dev', name: 'FLUX Dev', description: 'Balanced (~10s)' },
-  { id: 'flux-pro', name: 'FLUX Pro', description: 'High quality (~15s)' },
-  { id: 'flux-pro-1.1', name: 'FLUX Pro 1.1', description: 'Best quality (~15s)' },
-  { id: 'nana-banana-pro', name: 'Nana Banana Pro', description: 'Creative (~10s)' },
+  { id: 'flux-pro-1.1-ultra', name: 'FLUX Pro 1.1 Ultra', description: 'High quality (~15s)' },
+  { id: 'flux-2-pro', name: 'FLUX 2 Pro', description: 'Best quality (~20s)' },
+  { id: 'nano-banana-pro', name: 'Nano Banana Pro', description: 'Creative (~10s)' },
 ];
 
 export function TodayHeader() {
@@ -187,102 +188,144 @@ export function TodayHeader() {
         className="mt-6 h-px bg-gradient-to-r from-transparent via-warm-gray-dark to-transparent origin-left"
       />
 
-      {/* Prompt Modal */}
-      <AnimatePresence>
-        {showPromptModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-            onClick={() => !isGenerating && setShowPromptModal(false)}
+      {/* Prompt Modal - rendered via portal to #modal-root */}
+      {showPromptModal && createPortal(
+        <div
+          className="image-gen-modal-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1rem',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            boxSizing: 'border-box',
+          }}
+          onClick={() => !isGenerating && setShowPromptModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: '#2a2a2c',
+              borderRadius: '12px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              width: '448px',
+              maxWidth: 'calc(100vw - 2rem)',
+              padding: '24px',
+            }}
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-parchment rounded-xl shadow-xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display text-lg font-semibold text-ink">
-                  Generate Header Image
-                </h3>
-                <button
-                  onClick={() => !isGenerating && setShowPromptModal(false)}
-                  className="p-1 rounded-lg hover:bg-warm-gray/50 text-ink-muted"
-                  disabled={isGenerating}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <p className="font-ui text-sm text-ink-muted mb-4">
-                Describe the panoramic image you'd like for today's header.
-              </p>
-
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="A serene mountain landscape at sunrise with soft pastel colors and misty valleys..."
-                className="w-full h-24 px-3 py-2 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-lg resize-none focus:outline-none focus:border-terracotta placeholder:text-ink-faint"
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 600, color: '#f5f5f5', margin: 0 }}>
+                Generate Header Image
+              </h3>
+              <button
+                onClick={() => !isGenerating && setShowPromptModal(false)}
+                style={{ padding: '4px', borderRadius: '8px', color: '#9c9ca0', background: 'transparent', border: 'none', cursor: 'pointer' }}
                 disabled={isGenerating}
-              />
+              >
+                <X style={{ width: '20px', height: '20px' }} />
+              </button>
+            </div>
 
-              {/* Model selector */}
-              <div className="mt-3">
-                <label className="font-ui text-xs text-ink-muted block mb-1.5">Model</label>
-                <div className="relative">
-                  <select
-                    value={selectedModel}
-                    onChange={(e) => setSelectedModel(e.target.value)}
-                    disabled={isGenerating}
-                    className="w-full appearance-none px-3 py-2 pr-8 text-sm font-ui bg-cream text-ink border border-warm-gray-dark rounded-lg focus:outline-none focus:border-terracotta cursor-pointer"
-                  >
-                    {FAL_MODELS.map((model) => (
-                      <option key={model.id} value={model.id}>
-                        {model.name} - {model.description}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" />
-                </div>
-              </div>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', color: '#9c9ca0', marginBottom: '16px', marginTop: 0 }}>
+              Describe the panoramic image you'd like for today's header.
+            </p>
 
-              {error && (
-                <p className="mt-3 text-sm text-red-500 font-ui">{error}</p>
-              )}
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="A serene mountain landscape at sunrise with soft pastel colors and misty valleys..."
+              style={{
+                display: 'block',
+                width: '100%',
+                height: '96px',
+                padding: '8px 12px',
+                fontSize: '14px',
+                fontFamily: 'var(--font-ui)',
+                backgroundColor: '#222224',
+                color: '#f5f5f5',
+                border: '1px solid #3d3d42',
+                borderRadius: '8px',
+                resize: 'none',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+              disabled={isGenerating}
+            />
 
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => setShowPromptModal(false)}
-                  className="btn btn-secondary text-sm"
+            {/* Model selector */}
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ fontFamily: 'var(--font-ui)', fontSize: '12px', color: '#9c9ca0', display: 'block', marginBottom: '6px' }}>Model</label>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
                   disabled={isGenerating}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    appearance: 'none',
+                    padding: '8px 32px 8px 12px',
+                    fontSize: '14px',
+                    fontFamily: 'var(--font-ui)',
+                    backgroundColor: '#222224',
+                    color: '#f5f5f5',
+                    border: '1px solid #3d3d42',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleGenerateImage}
-                  disabled={!prompt.trim() || isGenerating}
-                  className="btn btn-primary text-sm"
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-4 h-4" />
-                      Generate
-                    </>
-                  )}
-                </button>
+                  {FAL_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} - {model.description}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '16px', height: '16px', color: '#9c9ca0', pointerEvents: 'none' }} />
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
+
+            {error && (
+              <p style={{ marginTop: '12px', fontSize: '14px', color: '#ef4444', fontFamily: 'var(--font-ui)' }}>{error}</p>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button
+                onClick={() => setShowPromptModal(false)}
+                className="btn btn-secondary text-sm"
+                disabled={isGenerating}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateImage}
+                disabled={!prompt.trim() || isGenerating}
+                className="btn btn-primary text-sm"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.getElementById('modal-root') || document.body
+      )}
     </motion.header>
   );
 }

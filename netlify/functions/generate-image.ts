@@ -5,9 +5,9 @@ import { jsonResponse, errorResponse } from './utils/db';
 const FAL_MODELS: Record<string, { url: string; steps: number }> = {
   'flux-schnell': { url: 'https://fal.run/fal-ai/flux/schnell', steps: 4 },
   'flux-dev': { url: 'https://fal.run/fal-ai/flux/dev', steps: 28 },
-  'flux-pro': { url: 'https://fal.run/fal-ai/flux-pro', steps: 25 },
-  'flux-pro-1.1': { url: 'https://fal.run/fal-ai/flux-pro/v1.1', steps: 25 },
-  'nana-banana-pro': { url: 'https://fal.run/fal-ai/nana-banana/pro', steps: 30 },
+  'flux-pro-1.1-ultra': { url: 'https://fal.run/fal-ai/flux-pro/v1.1-ultra', steps: 25 },
+  'flux-2-pro': { url: 'https://fal.run/fal-ai/flux-2-pro', steps: 25 },
+  'nano-banana-pro': { url: 'https://fal.run/fal-ai/nano-banana-pro', steps: 30 },
 };
 
 interface GenerateImageRequest {
@@ -23,7 +23,10 @@ export default async function handler(req: Request, _context: Context) {
 
   try {
     const body = await req.json();
-    const { prompt, apiKey, model = 'flux-schnell' } = body as GenerateImageRequest;
+    const { prompt, apiKey: rawApiKey, model = 'flux-schnell' } = body as GenerateImageRequest;
+
+    // Trim the API key to remove any accidental whitespace
+    const apiKey = rawApiKey?.trim();
 
     if (!apiKey) {
       return errorResponse('FAL.ai API key is required', 400);
@@ -36,7 +39,19 @@ export default async function handler(req: Request, _context: Context) {
     // Get model config, default to flux-schnell
     const modelConfig = FAL_MODELS[model] || FAL_MODELS['flux-schnell'];
 
-    console.log('Generating image with model:', model, 'prompt:', prompt.substring(0, 100));
+    console.log('Generating image with model:', model);
+    console.log('Using endpoint:', modelConfig.url);
+    console.log('API key length:', apiKey.length, 'first 4 chars:', apiKey.substring(0, 4));
+
+    const requestBody = {
+      prompt: prompt.trim(),
+      image_size: 'landscape_16_9',
+      num_inference_steps: modelConfig.steps,
+      num_images: 1,
+      enable_safety_checker: true,
+    };
+
+    console.log('Request body:', JSON.stringify(requestBody));
 
     const response = await fetch(modelConfig.url, {
       method: 'POST',
@@ -44,13 +59,7 @@ export default async function handler(req: Request, _context: Context) {
         'Content-Type': 'application/json',
         'Authorization': `Key ${apiKey}`,
       },
-      body: JSON.stringify({
-        prompt: prompt,
-        image_size: 'landscape_16_9', // wide panoramic for header banner
-        num_inference_steps: modelConfig.steps,
-        num_images: 1,
-        enable_safety_checker: true,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

@@ -14,6 +14,8 @@ interface SyncData {
   focusLines: unknown[];
   settings: unknown;
   interestAreas: unknown[];
+  weeklyInsights: unknown[];
+  weeklyReflections: unknown[];
 }
 
 interface SyncResponse extends SyncData {

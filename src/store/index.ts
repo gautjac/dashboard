@@ -617,6 +617,8 @@ export const useDashboardStore = create<DashboardStore>()(
             focusLines: state.focusLines,
             settings: state.settings,
             interestAreas: state.interestAreas,
+            weeklyInsights: state.weeklyInsights,
+            weeklyReflections: state.weeklyReflections,
           });
 
           if (success) {
@@ -646,6 +648,8 @@ export const useDashboardStore = create<DashboardStore>()(
               journalEntries: data.journalEntries as JournalEntry[],
               focusLines: data.focusLines as FocusLine[],
               interestAreas: data.interestAreas as InterestArea[],
+              weeklyInsights: (data.weeklyInsights as WeeklyInsight[]) || state.weeklyInsights,
+              weeklyReflections: (data.weeklyReflections as WeeklyReflection[]) || state.weeklyReflections,
               settings: data.settings as UserSettings || state.settings,
               syncStatus: 'idle',
               lastSyncedAt: data.syncedAt,
