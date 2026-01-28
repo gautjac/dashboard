@@ -181,6 +181,35 @@ export async function initializeSchema() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS weekly_insights (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      week_start DATE NOT NULL,
+      themes TEXT[] DEFAULT '{}',
+      sentiment_trend TEXT,
+      top_stressors TEXT[] DEFAULT '{}',
+      top_energizers TEXT[] DEFAULT '{}',
+      habit_correlations JSONB DEFAULT '[]',
+      summary TEXT,
+      generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(user_id, week_start)
+    )
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS weekly_reflections (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      week_start DATE NOT NULL,
+      week_end DATE NOT NULL,
+      reflection TEXT NOT NULL,
+      stats JSONB NOT NULL DEFAULT '{}',
+      generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE(user_id, week_start)
+    )
+  `;
+
   // Create indexes for common queries
   await sql`CREATE INDEX IF NOT EXISTS idx_habits_user ON habits(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_completions_habit ON habit_completions(habit_id)`;
@@ -198,6 +227,8 @@ export async function initializeSchema() {
   await sql`CREATE INDEX IF NOT EXISTS idx_quotes_user ON quotes(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_ideas_user ON ideas(user_id)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_ideas_user_date ON ideas(user_id, created_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_weekly_insights_user_week ON weekly_insights(user_id, week_start)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_weekly_reflections_user_week ON weekly_reflections(user_id, week_start)`;
 
   // Add archived_at columns if they don't exist (migrations)
   await sql`
