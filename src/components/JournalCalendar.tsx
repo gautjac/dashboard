@@ -74,10 +74,15 @@ export function JournalCalendar({ onClose, onSelectEntry }: JournalCalendarProps
   }, []);
 
   // Create a map of dates to entries for quick lookup
+  // Normalize date format to yyyy-MM-dd (entries may come as ISO strings with time)
   const entriesByDate = useMemo(() => {
     const map = new Map<string, JournalEntry>();
     journalEntries.forEach((entry) => {
-      map.set(entry.date, entry);
+      // Handle both 'yyyy-MM-dd' and ISO timestamp formats
+      const dateKey = entry.date.includes('T')
+        ? entry.date.split('T')[0]
+        : entry.date;
+      map.set(dateKey, entry);
     });
     return map;
   }, [journalEntries]);
