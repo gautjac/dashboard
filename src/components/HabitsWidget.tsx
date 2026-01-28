@@ -275,6 +275,7 @@ export function HabitsWidget() {
     habitsWithStats,
     toggleHabitCompletion,
     setHabitValue,
+    refreshHabits,
   } = useHabits();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -421,7 +422,15 @@ export function HabitsWidget() {
 
       {/* Add Habit Modal */}
       <AnimatePresence>
-        {showAddHabit && <AddHabitModal onClose={() => setShowAddHabit(false)} />}
+        {showAddHabit && (
+          <AddHabitModal
+            onClose={() => {
+              setShowAddHabit(false);
+              // Refresh habits in case a new one was added
+              refreshHabits();
+            }}
+          />
+        )}
       </AnimatePresence>
 
       {/* Edit Habit Modal */}
@@ -429,7 +438,11 @@ export function HabitsWidget() {
         {editingHabit && (
           <EditHabitModal
             habit={editingHabit}
-            onClose={() => setEditingHabit(null)}
+            onClose={() => {
+              setEditingHabit(null);
+              // Refresh habits in case of deletion or update
+              refreshHabits();
+            }}
           />
         )}
       </AnimatePresence>
