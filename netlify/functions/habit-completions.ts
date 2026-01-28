@@ -46,14 +46,14 @@ export default async function handler(req: Request, _context: Context) {
             SELECT * FROM habit_completions
             WHERE user_id = ${normalizedUserId}
             AND habit_id = ${habitId}
-            AND date >= CURRENT_DATE - ${days}
+            AND date >= CURRENT_DATE - INTERVAL '1 day' * ${days}
             ORDER BY date DESC
           `;
         } else {
           completions = await sql`
             SELECT * FROM habit_completions
             WHERE user_id = ${normalizedUserId}
-            AND date >= CURRENT_DATE - ${days}
+            AND date >= CURRENT_DATE - INTERVAL '1 day' * ${days}
             ORDER BY date DESC
           `;
         }
