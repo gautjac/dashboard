@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Sun, Cloud, Moon, ImagePlus, Loader2, X, Sparkles, ChevronDown } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
+import { useSettings } from '../hooks';
 
 // Available FAL.ai models
 const FAL_MODELS = [
@@ -15,7 +16,8 @@ const FAL_MODELS = [
 ];
 
 export function TodayHeader() {
-  const { settings, setDailyImage, getTodayImage } = useDashboardStore();
+  const { setDailyImage, getTodayImage } = useDashboardStore();
+  const { settings } = useSettings();
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [selectedModel, setSelectedModel] = useState('flux-schnell');
