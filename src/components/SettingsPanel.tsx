@@ -660,6 +660,84 @@ export function SettingsPanel() {
                   </div>
                 </div>
 
+                {/* Custom Journal Prompts */}
+                <div>
+                  <label className="font-ui text-sm font-medium text-ink block mb-2">
+                    Custom Journal Prompts
+                  </label>
+                  <p className="font-ui text-xs text-ink-muted mb-3">
+                    Add your own prompts that will be randomly selected as "Today's Prompt"
+                  </p>
+
+                  {/* Existing prompts list */}
+                  {settings.customJournalPrompts && settings.customJournalPrompts.length > 0 && (
+                    <div className="space-y-2 mb-3">
+                      {settings.customJournalPrompts.map((prompt, index) => (
+                        <div
+                          key={index}
+                          className="flex items-start gap-2 p-2 rounded-lg bg-warm-gray/30"
+                        >
+                          <p className="flex-1 font-ui text-sm text-ink">{prompt}</p>
+                          <button
+                            onClick={() => {
+                              const newPrompts = settings.customJournalPrompts?.filter((_, i) => i !== index);
+                              updateSettings({ customJournalPrompts: newPrompts });
+                            }}
+                            className="btn-ghost p-1.5 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 flex-shrink-0"
+                            title="Remove prompt"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add new prompt */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Enter a new journal prompt..."
+                      className="input flex-1 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const input = e.target as HTMLInputElement;
+                          const value = input.value.trim();
+                          if (value) {
+                            const currentPrompts = settings.customJournalPrompts || [];
+                            updateSettings({
+                              customJournalPrompts: [...currentPrompts, value],
+                            });
+                            input.value = '';
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={(e) => {
+                        const input = (e.target as HTMLElement).parentElement?.querySelector('input');
+                        if (input) {
+                          const value = input.value.trim();
+                          if (value) {
+                            const currentPrompts = settings.customJournalPrompts || [];
+                            updateSettings({
+                              customJournalPrompts: [...currentPrompts, value],
+                            });
+                            input.value = '';
+                          }
+                        }
+                      }}
+                      className="btn btn-secondary text-sm"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add
+                    </button>
+                  </div>
+                  <p className="font-ui text-xs text-ink-muted mt-2">
+                    {settings.customJournalPrompts?.length || 0} custom prompt{(settings.customJournalPrompts?.length || 0) !== 1 ? 's' : ''} saved
+                  </p>
+                </div>
+
                 {/* Daily word target */}
                 {(() => {
                   const writeHabit = habits.find(

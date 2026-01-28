@@ -129,6 +129,7 @@ export interface UserSettings {
   dailyBriefLength: 'short' | 'medium' | 'long';
   journalPromptStyle: JournalPromptStyleType;
   journalPromptInstructions?: JournalPromptStyleInstructions; // Per-style custom instructions
+  customJournalPrompts?: string[]; // User's custom prompts for random selection
   computerAccessEnabled: boolean;
   aiAnalysisEnabled: boolean;
   dataExportFormat: 'json' | 'csv';

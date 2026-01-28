@@ -46,18 +46,56 @@ export function JournalWidget() {
     journalEntries,
     setJournalEditorOpen,
     deleteJournalEntry,
+    settings,
   } = useDashboardStore();
+
+  // Helper to get a random custom prompt or fall back to default
+  const getCustomOrDefaultPrompt = (): JournalPrompt => {
+    const customPrompts = settings.customJournalPrompts;
+    if (customPrompts && customPrompts.length > 0) {
+      const randomIndex = Math.floor(Math.random() * customPrompts.length);
+      return {
+        id: `custom-${randomIndex}`,
+        text: customPrompts[randomIndex],
+        category: 'reflective', // Default category for custom prompts
+      };
+    }
+    return getTodayPrompt();
+  };
+
+  // Helper to get today's custom prompt (deterministic for the day)
+  const getTodaysCustomPrompt = (): JournalPrompt => {
+    const customPrompts = settings.customJournalPrompts;
+    if (customPrompts && customPrompts.length > 0) {
+      const dayOfYear = Math.floor(
+        (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      const index = dayOfYear % customPrompts.length;
+      return {
+        id: `custom-${index}`,
+        text: customPrompts[index],
+        category: 'reflective',
+      };
+    }
+    return getTodayPrompt();
+  };
 
   const todayEntry = getTodayEntry();
   const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(
-    getTodayPrompt()
+    getTodaysCustomPrompt()
   );
   const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('journal');
   const [showCalendar, setShowCalendar] = useState(false);
   const [viewingEntry, setViewingEntry] = useState<JournalEntry | null>(null);
 
   const refreshPrompt = () => {
-    setCurrentPrompt(getRandomPrompt());
+    const customPrompts = settings.customJournalPrompts;
+    if (customPrompts && customPrompts.length > 0) {
+      setCurrentPrompt(getCustomOrDefaultPrompt());
+    } else {
+      setCurrentPrompt(getRandomPrompt());
+    }
   };
 
   // Get last few entries for quick view
