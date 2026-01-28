@@ -1,54 +1,131 @@
 import type { Context } from '@netlify/functions';
-import { getDb, getUserIdFromContext, getUserEmailFromContext, ensureUser, jsonResponse, errorResponse, unauthorizedResponse } from './utils/db';
+import { getDb, jsonResponse, errorResponse } from './utils/db';
 
-export default async function handler(req: Request, context: Context) {
-  const sql = getDb();
+// Helper to get or create user and settings
+async function ensureUserAndSettings(sql: ReturnType<typeof getDb>, userId: string) {
+  // First check if user exists
+  const existing = await sql`SELECT id FROM users WHERE id = ${userId}`;
 
-  const netlifyUserId = getUserIdFromContext(context);
-  const email = getUserEmailFromContext(context);
-
-  if (!netlifyUserId || !email) {
-    return unauthorizedResponse();
+  if (existing.length === 0) {
+    // Create user with userId as both id and email
+    await sql`
+      INSERT INTO users (id, email)
+      VALUES (${userId}, ${userId})
+      ON CONFLICT (id) DO NOTHING
+    `;
   }
 
-  const userId = await ensureUser(sql, netlifyUserId, email);
+  // Ensure settings row exists
+  await sql`
+    INSERT INTO user_settings (user_id)
+    VALUES (${userId})
+    ON CONFLICT (user_id) DO NOTHING
+  `;
+
+  return userId;
+}
+
+// Map database row to frontend format
+function mapSettingsFromDb(row: any) {
+  return {
+    theme: row.theme || 'light',
+    showWeather: row.show_weather ?? false,
+    weatherLocation: row.weather_location || undefined,
+    dailyBriefLength: row.daily_brief_length || 'medium',
+    journalPromptStyle: row.journal_prompt_style || 'mixed',
+    journalPromptInstructions: row.journal_prompt_instructions || undefined,
+    customJournalPrompts: row.custom_journal_prompts || undefined,
+    computerAccessEnabled: row.computer_access_enabled ?? false,
+    aiAnalysisEnabled: row.ai_analysis_enabled ?? true,
+    dataExportFormat: row.data_export_format || 'json',
+  };
+}
+
+export default async function handler(req: Request, _context: Context) {
+  const sql = getDb();
+  const url = new URL(req.url);
+
+  // Get userId from query parameters
+  const userId = url.searchParams.get('userId');
+
+  if (!userId) {
+    return errorResponse('userId is required', 401);
+  }
+
+  // Normalize userId to lowercase
+  const normalizedUserId = userId.toLowerCase().trim();
 
   try {
+    // Ensure user and settings exist
+    await ensureUserAndSettings(sql, normalizedUserId);
+
     switch (req.method) {
       case 'GET': {
-        const result = await sql`
-          SELECT * FROM user_settings WHERE user_id = ${userId}
+        const settings = await sql`
+          SELECT * FROM user_settings WHERE user_id = ${normalizedUserId}
         `;
 
-        if (result.length === 0) {
-          // Create default settings
-          const newSettings = await sql`
-            INSERT INTO user_settings (user_id)
-            VALUES (${userId})
-            RETURNING *
-          `;
-          return jsonResponse(newSettings[0]);
+        if (settings.length === 0) {
+          // Return defaults
+          return jsonResponse({
+            settings: {
+              theme: 'light',
+              showWeather: false,
+              dailyBriefLength: 'medium',
+              journalPromptStyle: 'mixed',
+              computerAccessEnabled: false,
+              aiAnalysisEnabled: true,
+              dataExportFormat: 'json',
+            },
+          });
         }
 
-        return jsonResponse(result[0]);
+        return jsonResponse({
+          settings: mapSettingsFromDb(settings[0]),
+        });
       }
 
       case 'PUT': {
         const body = await req.json();
-        const { theme, dailyBriefLength, journalPromptStyle, computerAccessEnabled } = body;
+        const {
+          theme,
+          showWeather,
+          weatherLocation,
+          dailyBriefLength,
+          journalPromptStyle,
+          journalPromptInstructions,
+          customJournalPrompts,
+          computerAccessEnabled,
+          aiAnalysisEnabled,
+          dataExportFormat,
+        } = body;
 
+        // Update settings with COALESCE to preserve unset values
         const result = await sql`
           UPDATE user_settings
           SET
             theme = COALESCE(${theme}, theme),
+            show_weather = COALESCE(${showWeather}, show_weather),
+            weather_location = COALESCE(${weatherLocation}, weather_location),
             daily_brief_length = COALESCE(${dailyBriefLength}, daily_brief_length),
             journal_prompt_style = COALESCE(${journalPromptStyle}, journal_prompt_style),
-            computer_access_enabled = COALESCE(${computerAccessEnabled}, computer_access_enabled)
-          WHERE user_id = ${userId}
+            journal_prompt_instructions = COALESCE(${journalPromptInstructions ? JSON.stringify(journalPromptInstructions) : null}, journal_prompt_instructions),
+            custom_journal_prompts = COALESCE(${customJournalPrompts}, custom_journal_prompts),
+            computer_access_enabled = COALESCE(${computerAccessEnabled}, computer_access_enabled),
+            ai_analysis_enabled = COALESCE(${aiAnalysisEnabled}, ai_analysis_enabled),
+            data_export_format = COALESCE(${dataExportFormat}, data_export_format),
+            updated_at = NOW()
+          WHERE user_id = ${normalizedUserId}
           RETURNING *
         `;
 
-        return jsonResponse(result[0]);
+        if (result.length === 0) {
+          return errorResponse('Settings not found', 404);
+        }
+
+        return jsonResponse({
+          settings: mapSettingsFromDb(result[0]),
+        });
       }
 
       default:

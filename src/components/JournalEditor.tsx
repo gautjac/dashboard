@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
-import { useClaudeAnalysis } from '../hooks';
+import { useClaudeAnalysis, useJournal, useHabits } from '../hooks';
 import { getTodayPrompt, getRandomPrompt } from '../data/sampleData';
 import type { JournalPrompt } from '../types';
 
@@ -50,14 +50,12 @@ const suggestedTags = [
 ];
 
 export function JournalEditor() {
-  const {
-    getTodayEntry,
-    addJournalEntry,
-    updateJournalEntry,
-    setJournalEditorOpen,
-    habits,
-    setHabitValue,
-  } = useDashboardStore();
+  // DB-first hooks
+  const { todayEntry, addJournalEntry, updateJournalEntry } = useJournal();
+  const { habits, setHabitValue } = useHabits();
+
+  // UI state from store
+  const { setJournalEditorOpen } = useDashboardStore();
 
   const {
     isConfigured: isAIConfigured,
@@ -65,7 +63,6 @@ export function JournalEditor() {
     generateContextualPrompt,
   } = useClaudeAnalysis();
 
-  const todayEntry = getTodayEntry();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Step tracking: 'mood' for mood selection, 'editor' for main editor

@@ -1,77 +1,126 @@
 import type { Context } from '@netlify/functions';
-import { getDb, getUserIdFromContext, getUserEmailFromContext, ensureUser, jsonResponse, errorResponse, unauthorizedResponse } from './utils/db';
+import { getDb, jsonResponse, errorResponse } from './utils/db';
 
-export default async function handler(req: Request, context: Context) {
+// Generate a unique ID
+function generateId(): string {
+  return `habit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Helper to ensure user exists
+async function ensureUserExists(sql: ReturnType<typeof getDb>, userId: string) {
+  const existing = await sql`SELECT id FROM users WHERE id = ${userId}`;
+  if (existing.length === 0) {
+    await sql`
+      INSERT INTO users (id, email)
+      VALUES (${userId}, ${userId})
+      ON CONFLICT (id) DO NOTHING
+    `;
+  }
+  return userId;
+}
+
+// Map database row to frontend format
+function mapHabitFromDb(row: any) {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || undefined,
+    schedule: row.schedule,
+    customDays: row.custom_days || undefined,
+    targetType: row.target_type,
+    targetValue: row.target_value || undefined,
+    targetUnit: row.target_unit || undefined,
+    tags: row.tags || [],
+    color: row.color || undefined,
+    icon: row.icon || undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export default async function handler(req: Request, _context: Context) {
   const sql = getDb();
   const url = new URL(req.url);
 
-  // Try query params first (for Clawdbot/external access), then Netlify Identity
-  let netlifyUserId = url.searchParams.get('userId');
-  let email = url.searchParams.get('email');
+  // Get userId from query parameters
+  const userId = url.searchParams.get('userId');
 
-  if (!netlifyUserId || !email) {
-    netlifyUserId = getUserIdFromContext(context);
-    email = getUserEmailFromContext(context);
+  if (!userId) {
+    return errorResponse('userId is required', 401);
   }
 
-  if (!netlifyUserId || !email) {
-    return unauthorizedResponse();
-  }
+  // Normalize userId to lowercase
+  const normalizedUserId = userId.toLowerCase().trim();
 
-  // Ensure user exists in database
-  const userId = await ensureUser(sql, netlifyUserId, email);
+  // Ensure user exists
+  await ensureUserExists(sql, normalizedUserId);
 
   const habitId = url.searchParams.get('id');
 
   try {
     switch (req.method) {
       case 'GET': {
-        // Get all habits for user (with completion stats)
+        // Get all habits for user
         const habits = await sql`
-          SELECT
-            h.*,
-            (
-              SELECT COUNT(*) FROM habit_completions hc
-              WHERE hc.habit_id = h.id
-              AND hc.completed_at >= CURRENT_DATE - INTERVAL '7 days'
-            ) as completions_last_7_days,
-            (
-              SELECT completed_at FROM habit_completions hc
-              WHERE hc.habit_id = h.id
-              ORDER BY completed_at DESC LIMIT 1
-            ) as last_completed
-          FROM habits h
-          WHERE h.user_id = ${userId} AND h.is_archived = false
-          ORDER BY h.created_at ASC
+          SELECT * FROM habits
+          WHERE user_id = ${normalizedUserId}
+          ORDER BY created_at ASC
         `;
 
-        // Get completions for the last 30 days
-        const completions = await sql`
-          SELECT hc.* FROM habit_completions hc
-          JOIN habits h ON h.id = hc.habit_id
-          WHERE h.user_id = ${userId}
-          AND hc.completed_at >= CURRENT_DATE - INTERVAL '30 days'
-          ORDER BY hc.completed_at DESC
-        `;
-
-        return jsonResponse({ habits, completions });
+        return jsonResponse({
+          habits: habits.map(mapHabitFromDb),
+        });
       }
 
       case 'POST': {
         const body = await req.json();
-        const { name, description, icon, color, frequency, targetDays, reminderTime } = body;
+        const {
+          id,
+          name,
+          description,
+          schedule,
+          customDays,
+          targetType,
+          targetValue,
+          targetUnit,
+          tags,
+          color,
+          icon,
+          createdAt,
+        } = body;
 
         if (!name) {
-          return errorResponse('Name is required');
+          return errorResponse('name is required');
         }
 
+        const habitIdToUse = id || generateId();
+        const createdAtToUse = createdAt || new Date().toISOString();
+
         const result = await sql`
-          INSERT INTO habits (user_id, name, description, icon, color, frequency, target_days, reminder_time)
-          VALUES (${userId}, ${name}, ${description}, ${icon}, ${color}, ${frequency || 'daily'}, ${targetDays}, ${reminderTime})
+          INSERT INTO habits (
+            id, user_id, name, description, schedule, custom_days,
+            target_type, target_value, target_unit, tags, color, icon, created_at
+          )
+          VALUES (
+            ${habitIdToUse},
+            ${normalizedUserId},
+            ${name},
+            ${description || null},
+            ${schedule || 'daily'},
+            ${customDays || null},
+            ${targetType || 'binary'},
+            ${targetValue || null},
+            ${targetUnit || null},
+            ${tags || []},
+            ${color || null},
+            ${icon || null},
+            ${createdAtToUse}
+          )
           RETURNING *
         `;
 
-        return jsonResponse(result[0], 201);
+        return jsonResponse({
+          habit: mapHabitFromDb(result[0]),
+        }, 201);
       }
 
       case 'PUT': {
@@ -80,20 +129,34 @@ export default async function handler(req: Request, context: Context) {
         }
 
         const body = await req.json();
-        const { name, description, icon, color, frequency, targetDays, reminderTime, isArchived } = body;
+        const {
+          name,
+          description,
+          schedule,
+          customDays,
+          targetType,
+          targetValue,
+          targetUnit,
+          tags,
+          color,
+          icon,
+        } = body;
 
         const result = await sql`
           UPDATE habits
           SET
             name = COALESCE(${name}, name),
             description = COALESCE(${description}, description),
-            icon = COALESCE(${icon}, icon),
+            schedule = COALESCE(${schedule}, schedule),
+            custom_days = COALESCE(${customDays}, custom_days),
+            target_type = COALESCE(${targetType}, target_type),
+            target_value = COALESCE(${targetValue}, target_value),
+            target_unit = COALESCE(${targetUnit}, target_unit),
+            tags = COALESCE(${tags}, tags),
             color = COALESCE(${color}, color),
-            frequency = COALESCE(${frequency}, frequency),
-            target_days = COALESCE(${targetDays}, target_days),
-            reminder_time = COALESCE(${reminderTime}, reminder_time),
-            is_archived = COALESCE(${isArchived}, is_archived)
-          WHERE id = ${habitId} AND user_id = ${userId}
+            icon = COALESCE(${icon}, icon),
+            updated_at = NOW()
+          WHERE id = ${habitId} AND user_id = ${normalizedUserId}
           RETURNING *
         `;
 
@@ -101,7 +164,9 @@ export default async function handler(req: Request, context: Context) {
           return errorResponse('Habit not found', 404);
         }
 
-        return jsonResponse(result[0]);
+        return jsonResponse({
+          habit: mapHabitFromDb(result[0]),
+        });
       }
 
       case 'DELETE': {
@@ -110,7 +175,7 @@ export default async function handler(req: Request, context: Context) {
         }
 
         await sql`
-          DELETE FROM habits WHERE id = ${habitId} AND user_id = ${userId}
+          DELETE FROM habits WHERE id = ${habitId} AND user_id = ${normalizedUserId}
         `;
 
         return jsonResponse({ success: true });

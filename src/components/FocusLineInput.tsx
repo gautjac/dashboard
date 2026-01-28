@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Target, Check, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useDashboardStore } from '../store';
+import { useFocusLines } from '../hooks';
 
 export function FocusLineInput() {
-  const { getTodayFocusLine, setFocusLine } = useDashboardStore();
-  const todayFocus = getTodayFocusLine();
+  const { todayFocusLine: todayFocus, setFocusLine } = useFocusLines();
 
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(todayFocus?.text || '');

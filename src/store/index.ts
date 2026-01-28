@@ -636,12 +636,28 @@ export const useDashboardStore = create<DashboardStore>()(
 
       loadFromServer: async () => {
         const state = get();
-        if (!state.syncEnabled) return;
+        if (!state.syncEnabled) {
+          console.log('[loadFromServer] Sync not enabled, skipping');
+          return;
+        }
+
+        const userId = syncService.getUserId();
+        console.log('[loadFromServer] Starting fetch for userId:', userId);
 
         set({ syncStatus: 'syncing' });
         try {
           const data = await syncService.fetchFromServer();
+          console.log('[loadFromServer] Server response:', {
+            hasData: !!data,
+            habits: data?.habits?.length ?? 0,
+            habitCompletions: data?.habitCompletions?.length ?? 0,
+            journalEntries: data?.journalEntries?.length ?? 0,
+            settings: data?.settings ? 'present' : 'missing',
+            settingsKeys: data?.settings ? Object.keys(data.settings) : [],
+          });
+
           if (data) {
+            console.log('[loadFromServer] Setting state with fetched data');
             set({
               habits: data.habits as Habit[],
               habitCompletions: data.habitCompletions as HabitCompletion[],
@@ -654,10 +670,13 @@ export const useDashboardStore = create<DashboardStore>()(
               syncStatus: 'idle',
               lastSyncedAt: data.syncedAt,
             });
+            console.log('[loadFromServer] State updated successfully');
           } else {
+            console.log('[loadFromServer] No data returned from server');
             set({ syncStatus: 'error' });
           }
-        } catch {
+        } catch (error) {
+          console.error('[loadFromServer] Error:', error);
           set({ syncStatus: 'error' });
         }
       },

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
+import { useJournal, useSettings } from '../hooks';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import { getTodayPrompt, getRandomPrompt } from '../data/sampleData';
 import { JournalCalendar } from './JournalCalendar';
@@ -41,13 +42,12 @@ const energyIcons = [
 ];
 
 export function JournalWidget() {
-  const {
-    getTodayEntry,
-    journalEntries,
-    setJournalEditorOpen,
-    deleteJournalEntry,
-    settings,
-  } = useDashboardStore();
+  // DB-first hooks
+  const { journalEntries, todayEntry, deleteJournalEntry } = useJournal();
+  const { settings } = useSettings();
+
+  // UI state from store
+  const { setJournalEditorOpen } = useDashboardStore();
 
   // Helper to get a random custom prompt or fall back to default
   const getCustomOrDefaultPrompt = (): JournalPrompt => {
@@ -81,7 +81,6 @@ export function JournalWidget() {
     return getTodayPrompt();
   };
 
-  const todayEntry = getTodayEntry();
   const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(
     getTodaysCustomPrompt()
   );

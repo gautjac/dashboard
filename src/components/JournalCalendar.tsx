@@ -15,7 +15,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { X, ChevronLeft, ChevronRight, Smile, Meh, Frown } from 'lucide-react';
-import { useDashboardStore } from '../store';
+import { useJournal } from '../hooks';
 import { useTheme } from '../hooks/useTheme';
 import type { JournalEntry } from '../types';
 
@@ -34,11 +34,16 @@ const moodIcons: Record<number, { icon: typeof Smile; color: string }> = {
 };
 
 export function JournalCalendar({ onClose, onSelectEntry }: JournalCalendarProps) {
-  const { journalEntries } = useDashboardStore();
+  console.log('[JournalCalendar] Component mounting...');
+
+  const { journalEntries, isLoading } = useJournal();
   const { isDark } = useTheme();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+
+  // Debug: log entries when they change
+  console.log('[JournalCalendar] journalEntries:', journalEntries.length, 'isLoading:', isLoading);
 
   // Theme-aware colors
   const colors = isDark ? {
@@ -207,6 +212,18 @@ export function JournalCalendar({ onClose, onSelectEntry }: JournalCalendarProps
 
         {/* Calendar Grid */}
         <div style={{ padding: 16, backgroundColor: colors.bg }}>
+          {/* Loading indicator */}
+          {isLoading && (
+            <div style={{ textAlign: 'center', padding: '8px 0', fontFamily: '"Jost", system-ui, sans-serif', fontSize: 12, color: colors.textMuted }}>
+              Loading entries...
+            </div>
+          )}
+          {/* Entry count for debugging */}
+          {!isLoading && (
+            <div style={{ textAlign: 'center', padding: '4px 0 8px', fontFamily: '"Jost", system-ui, sans-serif', fontSize: 11, color: colors.textFaint }}>
+              {journalEntries.length} entries found
+            </div>
+          )}
           {/* Day headers */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (

@@ -4,7 +4,6 @@ import { format } from 'date-fns';
 import { Settings, Sparkles, Bot, LogOut, Menu, X, Sun, Moon, Monitor } from 'lucide-react';
 import { useDashboardStore } from '../store';
 import { useAuth } from '../hooks/useAuth';
-import { useAutoSync } from '../hooks/useAutoSync';
 import { useTheme } from '../hooks/useTheme';
 import { TodayHeader } from './TodayHeader';
 import { FocusLineInput } from './FocusLineInput';
@@ -41,9 +40,6 @@ export function Dashboard() {
   const { theme, toggleTheme } = useTheme();
   const [reflectionPanelOpen, setReflectionPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Auto-sync data when changes occur
-  useAutoSync();
 
   // Get the appropriate theme icon
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;

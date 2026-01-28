@@ -12,7 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useDashboardStore } from '../store';
+import { useHabits } from '../hooks';
 import type { Habit } from '../types';
 
 interface EditHabitModalProps {
@@ -35,7 +35,7 @@ const scheduleOptions = [
 ] as const;
 
 export function EditHabitModal({ habit, onClose }: EditHabitModalProps) {
-  const { updateHabit, deleteHabit } = useDashboardStore();
+  const { updateHabit, deleteHabit } = useHabits();
 
   const [name, setName] = useState(habit.name);
   const [description, setDescription] = useState(habit.description || '');

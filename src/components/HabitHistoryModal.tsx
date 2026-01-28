@@ -2,14 +2,14 @@ import { useMemo } from 'react';
 import { format, subDays, startOfDay } from 'date-fns';
 import { X, Flame, TrendingUp } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useDashboardStore } from '../store';
+import { useHabits } from '../hooks';
 
 interface HabitHistoryModalProps {
   onClose: () => void;
 }
 
 export function HabitHistoryModal({ onClose }: HabitHistoryModalProps) {
-  const { habits, habitCompletions } = useDashboardStore();
+  const { habits, habitCompletions } = useHabits();
 
   // Generate last 30 days
   const days = useMemo(() => {

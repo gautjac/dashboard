@@ -18,7 +18,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useDashboardStore } from '../store';
+import { useHabits } from '../hooks';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import { HabitHistoryModal } from './HabitHistoryModal';
 import { AddHabitModal } from './AddHabitModal';
@@ -272,17 +272,15 @@ function HabitItem({ habit, onToggle, onSetValue, onEdit }: HabitItemProps) {
 
 export function HabitsWidget() {
   const {
-    getHabitsWithStats,
+    habitsWithStats,
     toggleHabitCompletion,
     setHabitValue,
-  } = useDashboardStore();
+  } = useHabits();
 
   const [showHistory, setShowHistory] = useState(false);
   const [showAddHabit, setShowAddHabit] = useState(false);
   const [editingHabit, setEditingHabit] = useState<HabitWithStats | null>(null);
   const { isCollapsed, toggle: toggleCollapsed } = useCollapsedState('habits');
-
-  const habitsWithStats = getHabitsWithStats();
   const completedCount = habitsWithStats.filter((h) => h.todayCompleted).length;
   const totalCount = habitsWithStats.length;
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;

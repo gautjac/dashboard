@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useDashboardStore } from '../store';
-import { useGoogleCalendar } from '../hooks/useGoogleCalendar';
+import { useGoogleCalendar, useSettings, useInterestAreas, useHabits, useJournal, useFocusLines } from '../hooks';
 import { useQuotes, type Quote as QuoteType } from '../hooks/useQuotes';
 import type { JournalPromptStyleType, ApiKey } from '../types';
 
@@ -46,17 +46,17 @@ const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function SettingsPanel() {
+  // DB-first hooks
+  const { settings, updateSettings } = useSettings();
+  const { interestAreas, updateInterestArea, deleteInterestArea, addInterestArea } = useInterestAreas();
+  const { habits, habitCompletions, updateHabit } = useHabits();
+  const { journalEntries } = useJournal();
+  const { focusLines } = useFocusLines();
+
+  // Store (for sync functionality - will be migrated later)
   const {
-    settings,
-    updateSettings,
     setSettingsOpen,
-    interestAreas,
-    habits,
-    habitCompletions,
-    journalEntries,
-    focusLines,
     weeklyReflections,
-    updateHabit,
     syncEnabled,
     syncStatus,
     lastSyncedAt,
@@ -93,6 +93,12 @@ export function SettingsPanel() {
   const [editingQuote, setEditingQuote] = useState<QuoteType | null>(null);
   const [editQuoteText, setEditQuoteText] = useState('');
   const [editQuoteAuthor, setEditQuoteAuthor] = useState('');
+
+  // Interest areas state
+  const [editingInterest, setEditingInterest] = useState<string | null>(null);
+  const [newInterestName, setNewInterestName] = useState('');
+  const [newInterestKeywords, setNewInterestKeywords] = useState('');
+  const [showAddInterest, setShowAddInterest] = useState(false);
 
   // Get sync userId from localStorage (same as syncService uses)
   const getSyncUserId = (): string | null => {
@@ -1423,54 +1429,179 @@ export function SettingsPanel() {
                   Configure topics for your daily brief. We'll curate news and updates based on these interests.
                 </p>
 
-                {interestAreas.length === 0 ? (
+                {interestAreas.length === 0 && !showAddInterest ? (
                   <div className="p-4 rounded-lg border border-dashed border-warm-gray-dark text-center">
                     <Newspaper className="w-8 h-8 text-ink-muted mx-auto mb-2" />
                     <p className="font-ui text-sm text-ink-muted mb-3">
                       No interests configured yet
                     </p>
-                    <button className="btn btn-primary text-sm">
+                    <button
+                      onClick={() => setShowAddInterest(true)}
+                      className="btn btn-primary text-sm"
+                    >
                       Add your first topic
                     </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {interestAreas.map((area) => (
-                      <div
-                        key={area.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-warm-gray/30"
-                      >
-                        <div>
-                          <p className="font-ui text-sm font-medium text-ink">
-                            {area.name}
-                          </p>
-                          <p className="font-ui text-xs text-ink-muted">
-                            {area.keywords.slice(0, 3).join(', ')}
-                            {area.keywords.length > 3 && ` +${area.keywords.length - 3}`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
+                      <div key={area.id}>
+                        {editingInterest === area.id ? (
+                          // Edit mode
+                          <div className="p-3 rounded-lg bg-warm-gray/30 space-y-3">
+                            <input
+                              type="text"
+                              defaultValue={area.name}
+                              id={`edit-interest-name-${area.id}`}
+                              placeholder="Topic name"
+                              className="input w-full text-sm"
+                            />
+                            <input
+                              type="text"
+                              defaultValue={area.keywords.join(', ')}
+                              id={`edit-interest-keywords-${area.id}`}
+                              placeholder="Keywords (comma separated)"
+                              className="input w-full text-sm"
+                            />
+                            <div className="flex items-center justify-between">
+                              <button
+                                onClick={() => {
+                                  if (confirm('Delete this interest?')) {
+                                    deleteInterestArea(area.id);
+                                    setEditingInterest(null);
+                                  }
+                                }}
+                                className="btn text-sm text-red-500 hover:text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete
+                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setEditingInterest(null)}
+                                  className="btn btn-secondary text-sm"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const nameInput = document.getElementById(`edit-interest-name-${area.id}`) as HTMLInputElement;
+                                    const keywordsInput = document.getElementById(`edit-interest-keywords-${area.id}`) as HTMLInputElement;
+                                    if (nameInput && keywordsInput) {
+                                      updateInterestArea(area.id, {
+                                        name: nameInput.value.trim(),
+                                        keywords: keywordsInput.value.split(',').map(k => k.trim()).filter(Boolean),
+                                      });
+                                      setEditingInterest(null);
+                                    }
+                                  }}
+                                  className="btn btn-primary text-sm"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // View mode
+                          <div className="flex items-center justify-between p-3 rounded-lg bg-warm-gray/30">
+                            <div>
+                              <p className="font-ui text-sm font-medium text-ink">
+                                {area.name}
+                              </p>
+                              <p className="font-ui text-xs text-ink-muted">
+                                {area.keywords.slice(0, 3).join(', ')}
+                                {area.keywords.length > 3 && ` +${area.keywords.length - 3}`}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => updateInterestArea(area.id, { enabled: !area.enabled })}
+                                className={`
+                                  p-1.5 rounded-lg transition-colors
+                                  ${area.enabled ? 'text-sage-dark hover:bg-sage-light/30' : 'text-ink-faint hover:bg-warm-gray'}
+                                `}
+                                title={area.enabled ? 'Disable' : 'Enable'}
+                              >
+                                {area.enabled ? (
+                                  <Check className="w-4 h-4" />
+                                ) : (
+                                  <X className="w-4 h-4" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => setEditingInterest(area.id)}
+                                className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
+                                title="Edit"
+                              >
+                                <Settings className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Add new interest form */}
+                    {showAddInterest && (
+                      <div className="p-3 rounded-lg bg-terracotta-light/20 border border-terracotta/20 space-y-3">
+                        <input
+                          type="text"
+                          value={newInterestName}
+                          onChange={(e) => setNewInterestName(e.target.value)}
+                          placeholder="Topic name (e.g., AI in Creative Tools)"
+                          className="input w-full text-sm"
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={newInterestKeywords}
+                          onChange={(e) => setNewInterestKeywords(e.target.value)}
+                          placeholder="Keywords (comma separated, e.g., generative AI, AI music)"
+                          className="input w-full text-sm"
+                        />
+                        <div className="flex justify-end gap-2">
                           <button
-                            className={`
-                              p-1.5 rounded-lg transition-colors
-                              ${area.enabled ? 'text-sage-dark' : 'text-ink-faint'}
-                            `}
+                            onClick={() => {
+                              setShowAddInterest(false);
+                              setNewInterestName('');
+                              setNewInterestKeywords('');
+                            }}
+                            className="btn btn-secondary text-sm"
                           >
-                            {area.enabled ? (
-                              <Check className="w-4 h-4" />
-                            ) : (
-                              <X className="w-4 h-4" />
-                            )}
+                            Cancel
                           </button>
-                          <button className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink">
-                            <Settings className="w-4 h-4" />
+                          <button
+                            onClick={async () => {
+                              if (newInterestName.trim()) {
+                                await addInterestArea({
+                                  name: newInterestName.trim(),
+                                  keywords: newInterestKeywords.split(',').map(k => k.trim()).filter(Boolean),
+                                  sources: [],
+                                  enabled: true,
+                                });
+                                setShowAddInterest(false);
+                                setNewInterestName('');
+                                setNewInterestKeywords('');
+                              }
+                            }}
+                            disabled={!newInterestName.trim()}
+                            className="btn btn-primary text-sm disabled:opacity-50"
+                          >
+                            Add Topic
                           </button>
                         </div>
                       </div>
-                    ))}
-                    <button className="btn btn-secondary text-sm w-full mt-2">
-                      Add new topic
-                    </button>
+                    )}
+
+                    {!showAddInterest && (
+                      <button
+                        onClick={() => setShowAddInterest(true)}
+                        className="btn btn-secondary text-sm w-full mt-2"
+                      >
+                        Add new topic
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -1581,6 +1712,16 @@ export function SettingsPanel() {
                   </div>
                 ) : (
                   <div className="space-y-4">
+                    {/* Show current User ID */}
+                    <div className="p-3 rounded-lg bg-sage-light/30 border border-sage/30">
+                      <label className="font-ui text-xs text-ink-muted uppercase tracking-wider block mb-1">
+                        Syncing as
+                      </label>
+                      <p className="font-ui text-sm font-medium text-ink break-all">
+                        {getSyncUserId() || 'Unknown'}
+                      </p>
+                    </div>
+
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="font-ui text-sm font-medium text-ink block">

@@ -29,10 +29,11 @@ class SyncService {
   private syncQueue: (() => Promise<void>)[] = [];
 
   setUserId(userId: string | null) {
-    this.userId = userId;
-    if (userId) {
+    // Normalize to lowercase to prevent case-sensitivity issues
+    this.userId = userId ? userId.toLowerCase().trim() : null;
+    if (this.userId) {
       // Store in localStorage for persistence
-      localStorage.setItem('dashboard_user_id', userId);
+      localStorage.setItem('dashboard_user_id', this.userId);
     } else {
       localStorage.removeItem('dashboard_user_id');
     }
@@ -40,7 +41,16 @@ class SyncService {
 
   getUserId(): string | null {
     if (!this.userId) {
-      this.userId = localStorage.getItem('dashboard_user_id');
+      const stored = localStorage.getItem('dashboard_user_id');
+      if (stored) {
+        // Normalize to lowercase and update storage if needed
+        const normalized = stored.toLowerCase().trim();
+        if (normalized !== stored) {
+          localStorage.setItem('dashboard_user_id', normalized);
+          console.log('[syncService] Normalized userId from', stored, 'to', normalized);
+        }
+        this.userId = normalized;
+      }
     }
     return this.userId;
   }
@@ -66,26 +76,36 @@ class SyncService {
    */
   async fetchFromServer(): Promise<SyncResponse | null> {
     const userId = this.getUserId();
+    console.log('[syncService.fetchFromServer] Using userId:', userId);
+
     if (!userId) {
-      console.warn('No user ID set, cannot fetch from server');
+      console.warn('[syncService.fetchFromServer] No user ID set, cannot fetch from server');
       return null;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/sync?userId=${encodeURIComponent(userId)}`, {
+      const url = `${API_BASE}/sync?userId=${encodeURIComponent(userId)}`;
+      console.log('[syncService.fetchFromServer] Fetching from:', url);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
 
+      console.log('[syncService.fetchFromServer] Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+        const errorText = await response.text();
+        console.error('[syncService.fetchFromServer] Error response:', errorText);
+        throw new Error(`Server returned ${response.status}: ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('[syncService.fetchFromServer] Received data keys:', Object.keys(data));
       this.lastSyncedAt = data.syncedAt;
       return data;
     } catch (error) {
-      console.error('Failed to fetch from server:', error);
+      console.error('[syncService.fetchFromServer] Failed to fetch from server:', error);
       return null;
     }
   }

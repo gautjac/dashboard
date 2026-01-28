@@ -11,7 +11,7 @@ import {
   Target,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useDashboardStore } from '../store';
+import { useHabits } from '../hooks';
 
 interface AddHabitModalProps {
   onClose: () => void;
@@ -32,7 +32,7 @@ const scheduleOptions = [
 ] as const;
 
 export function AddHabitModal({ onClose }: AddHabitModalProps) {
-  const { addHabit } = useDashboardStore();
+  const { addHabit } = useHabits();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

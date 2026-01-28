@@ -1,24 +1,41 @@
 import type { Context } from '@netlify/functions';
-import { getDb, getUserIdFromContext, getUserEmailFromContext, ensureUser, jsonResponse, errorResponse, unauthorizedResponse } from './utils/db';
+import { getDb, jsonResponse, errorResponse } from './utils/db';
 
-export default async function handler(req: Request, context: Context) {
+// Generate a unique ID
+function generateId(): string {
+  return `journal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Map database row to frontend format
+function mapEntryFromDb(row: any) {
+  return {
+    id: row.id,
+    date: row.date,
+    content: row.content,
+    mood: row.mood || undefined,
+    energy: row.energy || undefined,
+    tags: row.tags || [],
+    promptUsed: row.prompt_used || undefined,
+    aiReflection: row.ai_reflection || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export default async function handler(req: Request, _context: Context) {
   const sql = getDb();
   const url = new URL(req.url);
 
-  // Try query params first (for Clawdbot/external access), then Netlify Identity
-  let netlifyUserId = url.searchParams.get('userId');
-  let email = url.searchParams.get('email');
+  // Get userId from query parameters
+  const userId = url.searchParams.get('userId');
 
-  if (!netlifyUserId || !email) {
-    netlifyUserId = getUserIdFromContext(context);
-    email = getUserEmailFromContext(context);
+  if (!userId) {
+    return errorResponse('userId is required', 401);
   }
 
-  if (!netlifyUserId || !email) {
-    return unauthorizedResponse();
-  }
+  // Normalize userId to lowercase
+  const normalizedUserId = userId.toLowerCase().trim();
 
-  const userId = await ensureUser(sql, netlifyUserId, email);
   const entryId = url.searchParams.get('id');
   const date = url.searchParams.get('date');
 
@@ -26,57 +43,85 @@ export default async function handler(req: Request, context: Context) {
     switch (req.method) {
       case 'GET': {
         if (entryId) {
-          // Get single entry
+          // Get single entry by ID
           const result = await sql`
-            SELECT * FROM journal_entries WHERE id = ${entryId} AND user_id = ${userId}
+            SELECT * FROM journal_entries WHERE id = ${entryId} AND user_id = ${normalizedUserId}
           `;
           if (result.length === 0) {
             return errorResponse('Entry not found', 404);
           }
-          return jsonResponse(result[0]);
+          return jsonResponse({
+            entry: mapEntryFromDb(result[0]),
+          });
         } else if (date) {
           // Get entry for specific date
           const result = await sql`
-            SELECT * FROM journal_entries WHERE date = ${date} AND user_id = ${userId}
+            SELECT * FROM journal_entries WHERE date = ${date} AND user_id = ${normalizedUserId}
           `;
-          return jsonResponse(result[0] || null);
+          return jsonResponse({
+            entry: result.length > 0 ? mapEntryFromDb(result[0]) : null,
+          });
         } else {
           // Get all entries (paginated)
-          const limit = parseInt(url.searchParams.get('limit') || '30');
+          const limit = parseInt(url.searchParams.get('limit') || '365');
           const offset = parseInt(url.searchParams.get('offset') || '0');
 
           const entries = await sql`
             SELECT * FROM journal_entries
-            WHERE user_id = ${userId}
+            WHERE user_id = ${normalizedUserId}
             ORDER BY date DESC
             LIMIT ${limit} OFFSET ${offset}
           `;
-          return jsonResponse(entries);
+
+          return jsonResponse({
+            entries: entries.map(mapEntryFromDb),
+          });
         }
       }
 
       case 'POST': {
         const body = await req.json();
-        const { date: entryDate, content, mood, energy, tags, promptUsed } = body;
+        const { id, date: entryDate, content, mood, energy, tags, promptUsed, createdAt, updatedAt } = body;
 
         if (!entryDate || !content) {
           return errorResponse('date and content are required');
         }
 
+        const entryIdToUse = id || generateId();
+        const now = new Date().toISOString();
+        const createdAtToUse = createdAt || now;
+        const updatedAtToUse = updatedAt || now;
+
         // Upsert - insert or update if exists for this date
         const result = await sql`
-          INSERT INTO journal_entries (user_id, date, content, mood, energy, tags, prompt_used)
-          VALUES (${userId}, ${entryDate}, ${content}, ${mood}, ${energy}, ${tags || []}, ${promptUsed})
+          INSERT INTO journal_entries (
+            id, user_id, date, content, mood, energy, tags, prompt_used, created_at, updated_at
+          )
+          VALUES (
+            ${entryIdToUse},
+            ${normalizedUserId},
+            ${entryDate},
+            ${content},
+            ${mood || null},
+            ${energy || null},
+            ${tags || []},
+            ${promptUsed || null},
+            ${createdAtToUse},
+            ${updatedAtToUse}
+          )
           ON CONFLICT (user_id, date) DO UPDATE SET
             content = ${content},
-            mood = ${mood},
-            energy = ${energy},
+            mood = ${mood || null},
+            energy = ${energy || null},
             tags = ${tags || []},
-            prompt_used = ${promptUsed}
+            prompt_used = ${promptUsed || null},
+            updated_at = NOW()
           RETURNING *
         `;
 
-        return jsonResponse(result[0], 201);
+        return jsonResponse({
+          entry: mapEntryFromDb(result[0]),
+        }, 201);
       }
 
       case 'PUT': {
@@ -95,8 +140,9 @@ export default async function handler(req: Request, context: Context) {
             energy = COALESCE(${energy}, energy),
             tags = COALESCE(${tags}, tags),
             prompt_used = COALESCE(${promptUsed}, prompt_used),
-            ai_reflection = COALESCE(${aiReflection}, ai_reflection)
-          WHERE id = ${entryId} AND user_id = ${userId}
+            ai_reflection = COALESCE(${aiReflection}, ai_reflection),
+            updated_at = NOW()
+          WHERE id = ${entryId} AND user_id = ${normalizedUserId}
           RETURNING *
         `;
 
@@ -104,7 +150,9 @@ export default async function handler(req: Request, context: Context) {
           return errorResponse('Entry not found', 404);
         }
 
-        return jsonResponse(result[0]);
+        return jsonResponse({
+          entry: mapEntryFromDb(result[0]),
+        });
       }
 
       case 'DELETE': {
@@ -113,7 +161,7 @@ export default async function handler(req: Request, context: Context) {
         }
 
         await sql`
-          DELETE FROM journal_entries WHERE id = ${entryId} AND user_id = ${userId}
+          DELETE FROM journal_entries WHERE id = ${entryId} AND user_id = ${normalizedUserId}
         `;
 
         return jsonResponse({ success: true });

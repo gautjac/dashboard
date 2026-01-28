@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
-import { useClaudeAnalysis, useArticleEnhancement } from '../hooks';
+import { useClaudeAnalysis, useArticleEnhancement, useInterestAreas, useSettings } from '../hooks';
 import { useCollapsedState } from '../hooks/useCollapsedState';
 import type { DailyBriefItem } from '../types';
 
@@ -197,7 +197,12 @@ function TopicSection({ topic, items, defaultExpanded = true }: TopicSectionProp
 }
 
 export function DailyBriefWidget() {
-  const { getTodayBrief, interestAreas, settings } = useDashboardStore();
+  // DB-first hooks
+  const { interestAreas } = useInterestAreas();
+  const { settings } = useSettings();
+
+  // Store (for brief data - not synced)
+  const { getTodayBrief } = useDashboardStore();
   const { isConfigured: isAnthropicConfigured, isGeneratingBrief, error, generateDailyBrief, clearError } = useClaudeAnalysis();
   const brief = getTodayBrief();
   const hasInterests = interestAreas.some(i => i.enabled);
