@@ -178,13 +178,40 @@ Return ONLY the prompt question itself, nothing else. Make it personal and speci
    */
   async generateEntryReflection(
     entry: JournalEntry,
-    recentEntries: JournalEntry[]
+    recentEntries: JournalEntry[],
+    styleInstructionsMap?: JournalPromptStyleInstructions
   ): Promise<string> {
     const context = recentEntries
       .filter((e) => e.id !== entry.id)
       .slice(0, 3)
       .map((e) => `${e.date}: ${e.content.slice(0, 150)}...`)
       .join('\n\n');
+
+    // Build custom instructions section if provided
+    let customInstructionsSection = '';
+    if (styleInstructionsMap && Object.values(styleInstructionsMap).some(v => v)) {
+      const styleDescriptions = {
+        reflective: 'deep introspection, self-examination, emotions, inner thoughts',
+        creative: 'imaginative writing, metaphors, artistic expression, storytelling',
+        tactical: 'goals, decisions, action items, planning, problem-solving',
+        gratitude: 'appreciation, positive moments, thankfulness, silver linings',
+        mixed: 'general or doesn\'t fit other categories',
+      };
+
+      customInstructionsSection = `
+
+The user has provided custom instructions for different journaling styles. First, analyze their entry to determine which style it most closely matches, then use those instructions to shape your reflection.
+
+Available styles and their custom instructions:
+${Object.entries(styleInstructionsMap)
+  .filter(([, instructions]) => instructions)
+  .map(([style, instructions]) => `
+**${style.charAt(0).toUpperCase() + style.slice(1)}** (${styleDescriptions[style as keyof typeof styleDescriptions] || style}):
+${instructions}`)
+  .join('\n')}
+
+Based on the content of their entry, identify the most relevant style and incorporate those custom instructions into your reflection.`;
+    }
 
     const response = await this.makeRequest(
       [
@@ -200,6 +227,7 @@ ${entry.energy ? `Energy: ${entry.energy}/5` : ''}
 
 Recent context:
 ${context || 'No recent entries for context'}
+${customInstructionsSection}
 
 Provide a 2-3 sentence reflection that:
 1. Acknowledges what they wrote
@@ -211,7 +239,7 @@ Be warm but not saccharine. Be insightful but not prescriptive.`,
       ],
       {
         system:
-          'You are a supportive journaling companion. Your reflections are brief, insightful, and respect autonomy. Never diagnose or give medical advice. Focus on patterns and possibilities.',
+          'You are a supportive journaling companion. Your reflections are brief, insightful, and respect autonomy. Never diagnose or give medical advice. Focus on patterns and possibilities. When custom style instructions are provided, subtly incorporate them into your reflection based on the entry\'s content.',
         maxTokens: 300,
       }
     );

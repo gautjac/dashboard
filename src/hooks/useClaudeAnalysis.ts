@@ -212,7 +212,8 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
       try {
         const reflection = await anthropicService.generateEntryReflection(
           entry,
-          journalEntries.filter((e) => e.id !== entryId)
+          journalEntries.filter((e) => e.id !== entryId),
+          settings.journalPromptInstructions
         );
 
         // Update the entry with the reflection
@@ -231,7 +232,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
         setIsGeneratingReflection(false);
       }
     },
-    [isConfigured, journalEntries]
+    [isConfigured, journalEntries, settings.journalPromptInstructions]
   );
 
   const clearError = useCallback(() => {
