@@ -44,6 +44,8 @@ export function JournalCalendar({ onClose, onSelectEntry }: JournalCalendarProps
 
   // Debug: log entries when they change
   console.log('[JournalCalendar] journalEntries:', journalEntries.length, 'isLoading:', isLoading);
+  console.log('[JournalCalendar] Entry dates:', journalEntries.map(e => e.date));
+  console.log('[JournalCalendar] Current month:', format(currentMonth, 'yyyy-MM'));
 
   // Theme-aware colors
   const colors = isDark ? {

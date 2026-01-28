@@ -40,20 +40,25 @@ export default async function handler(req: Request, _context: Context) {
         const days = parseInt(url.searchParams.get('days') || '30');
         const habitId = url.searchParams.get('habitId');
 
+        // Calculate the start date in JavaScript to avoid SQL interval issues
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        const startDateStr = startDate.toISOString().split('T')[0];
+
         let completions;
         if (habitId) {
           completions = await sql`
             SELECT * FROM habit_completions
             WHERE user_id = ${normalizedUserId}
             AND habit_id = ${habitId}
-            AND date >= CURRENT_DATE - INTERVAL '1 day' * ${days}
+            AND date >= ${startDateStr}
             ORDER BY date DESC
           `;
         } else {
           completions = await sql`
             SELECT * FROM habit_completions
             WHERE user_id = ${normalizedUserId}
-            AND date >= CURRENT_DATE - INTERVAL '1 day' * ${days}
+            AND date >= ${startDateStr}
             ORDER BY date DESC
           `;
         }
