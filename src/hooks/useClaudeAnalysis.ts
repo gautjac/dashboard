@@ -216,6 +216,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
           })),
           promptStyle: settings.journalPromptStyle,
           styleInstructions: settings.journalPromptInstructions,
+          customPrompts: settings.customJournalPrompts || [],
           interests: [] // Not needed for this action
         })
       });

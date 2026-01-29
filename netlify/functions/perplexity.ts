@@ -100,7 +100,7 @@ Focus on practical implications, broader trends, or why someone interested in ${
 
     // Handle journal prompt generation
     if (action === 'generateJournalPrompt') {
-      const { recentEntries, habits, promptStyle, styleInstructions } = body as PerplexityRequest;
+      const { recentEntries, habits, promptStyle, styleInstructions, customPrompts } = body as PerplexityRequest;
       console.log('Generating contextual journal prompt');
 
       // Build context from recent entries
@@ -123,6 +123,12 @@ Focus on practical implications, broader trends, or why someone interested in ${
       // Get style-specific instructions
       const styleInstruction = styleInstructions?.[promptStyle || 'mixed'] || '';
 
+      // Build custom prompts context
+      let customPromptsContext = '';
+      if (customPrompts && customPrompts.length > 0) {
+        customPromptsContext = `\nThe user has provided these example prompts they like:\n${customPrompts.slice(0, 10).map((p, i) => `${i + 1}. "${p}"`).join('\n')}\n\nUse these as inspiration for the tone, depth, and style of prompt they prefer.`;
+      }
+
       const promptResponse = await fetch(PERPLEXITY_API_URL, {
         method: 'POST',
         headers: {
@@ -141,9 +147,11 @@ Focus on practical implications, broader trends, or why someone interested in ${
               content: `Generate a single, thoughtful journaling prompt for someone based on this context:
 
 ${entriesContext ? `Recent journal entries:\n${entriesContext}\n\n` : ''}${habitsContext ? `Current habits: ${habitsContext}\n\n` : ''}Prompt style: ${promptStyle || 'mixed'}
+${customPromptsContext}
 
 Create a prompt that:
 - Is personal and specific to their recent reflections (if available)
+- Matches the tone and style of their example prompts (if provided)
 - Encourages deeper self-reflection
 - Is open-ended but focused
 - Is 1-2 sentences maximum
@@ -177,11 +185,17 @@ Return ONLY the prompt text, nothing else.`
         return errorResponse('Content too short for analysis', 400);
       }
 
-      // Build list of available styles
+      // Build list of available styles with full instructions
       const availableStyles = Object.keys(styleInstructions || {});
       const stylesDescription = availableStyles.length > 0
-        ? availableStyles.map(s => `- ${s}: ${styleInstructions?.[s]?.slice(0, 100) || 'General prompts'}`).join('\n')
-        : '- reflective: Deep self-examination\n- creative: Imaginative exploration\n- analytical: Logical analysis\n- growth: Personal development';
+        ? availableStyles.map(s => `- ${s}: ${styleInstructions?.[s] || 'General prompts'}`).join('\n')
+        : '- reflective: Deep self-examination and introspection\n- creative: Imaginative exploration and metaphors\n- analytical: Logical analysis and pattern recognition\n- growth: Personal development and forward-looking';
+
+      // Build custom prompts context
+      let customPromptsContext = '';
+      if (customPrompts && customPrompts.length > 0) {
+        customPromptsContext = `\nThe user has provided these example prompts they prefer:\n${customPrompts.slice(0, 10).map((p, i) => `${i + 1}. "${p}"`).join('\n')}\n\nGenerate a prompt that matches their preferred tone, depth, and questioning style.`;
+      }
 
       const followUpResponse = await fetch(PERPLEXITY_API_URL, {
         method: 'POST',
@@ -194,7 +208,7 @@ Return ONLY the prompt text, nothing else.`
           messages: [
             {
               role: 'system',
-              content: `You are a thoughtful journaling coach. Analyze what someone has written and choose the best prompt style to deepen their reflection, then generate a follow-up prompt.`
+              content: `You are a thoughtful journaling coach. Analyze what someone has written and choose the best prompt style to deepen their reflection, then generate a follow-up prompt that matches their preferred style.`
             },
             {
               role: 'user',
@@ -206,10 +220,14 @@ ${currentContent.slice(0, 1500)}
 
 Available prompt styles:
 ${stylesDescription}
+${customPromptsContext}
 
 Based on what they've written:
 1. Choose the most appropriate style to deepen their reflection
-2. Generate a follow-up prompt that responds to their specific content
+2. Generate a follow-up prompt that:
+   - Responds to their specific content
+   - Matches the tone and style of their example prompts (if provided)
+   - Encourages deeper exploration
 
 Return your response as JSON:
 {
@@ -221,7 +239,7 @@ Return ONLY valid JSON, nothing else.`
             }
           ],
           temperature: 0.6,
-          max_tokens: 200
+          max_tokens: 250
         }),
       });
 
