@@ -20,6 +20,7 @@ interface UseClaudeAnalysisReturn {
   generateWeeklyInsights: () => Promise<WeeklyInsight | null>;
   generateDailyBrief: () => Promise<DailyBrief | null>;
   generateContextualPrompt: () => Promise<string | null>;
+  generateFollowUpPrompt: (currentContent: string) => Promise<{ prompt: string; chosenStyle: string } | null>;
   generateEntryReflection: (entryId: string) => Promise<string | null>;
   clearError: () => void;
 }
@@ -196,6 +197,39 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     }
   }, [isConfigured, journalEntries, habitsWithStats, settings.journalPromptStyle, settings.journalPromptInstructions]);
 
+  const generateFollowUpPrompt = useCallback(async (
+    currentContent: string
+  ): Promise<{ prompt: string; chosenStyle: string } | null> => {
+    if (!isConfigured) {
+      setError('Anthropic API key not configured');
+      return null;
+    }
+
+    if (!currentContent.trim()) {
+      setError('No content to analyze');
+      return null;
+    }
+
+    setIsGeneratingPrompt(true);
+    setError(null);
+
+    try {
+      const result = await anthropicService.generateFollowUpPrompt(
+        currentContent,
+        settings.customJournalPrompts || [],
+        settings.journalPromptInstructions
+      );
+
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate follow-up prompt';
+      setError(message);
+      return null;
+    } finally {
+      setIsGeneratingPrompt(false);
+    }
+  }, [isConfigured, settings.customJournalPrompts, settings.journalPromptInstructions]);
+
   const generateEntryReflection = useCallback(
     async (entryId: string): Promise<string | null> => {
       if (!isConfigured) {
@@ -252,6 +286,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     generateWeeklyInsights,
     generateDailyBrief,
     generateContextualPrompt,
+    generateFollowUpPrompt,
     generateEntryReflection,
     clearError,
   };

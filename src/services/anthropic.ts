@@ -174,6 +174,95 @@ Return ONLY the prompt question itself, nothing else. Make it personal and speci
   }
 
   /**
+   * Generate a follow-up prompt based on what the user has written so far.
+   * The AI analyzes the current entry and chooses the best prompt style dynamically.
+   */
+  async generateFollowUpPrompt(
+    currentContent: string,
+    customPrompts: string[],
+    styleInstructionsMap?: JournalPromptStyleInstructions
+  ): Promise<{ prompt: string; chosenStyle: string }> {
+    // Build the custom prompts list for reference
+    const customPromptsSection = customPrompts.length > 0
+      ? `\n\nThe user has provided these custom prompts they like:\n${customPrompts.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nYou may draw inspiration from these, but create a unique follow-up based on what they've written.`
+      : '';
+
+    // Build style instructions
+    const styleDescriptions = {
+      reflective: 'Deep introspection, examining emotions, motivations, and inner thoughts',
+      creative: 'Imaginative prompts, metaphors, artistic expression, storytelling angles',
+      tactical: 'Goals, decisions, action items, problem-solving, next steps',
+      gratitude: 'Appreciation, positive moments, thankfulness, silver linings',
+    };
+
+    const styleInstructionsSection = styleInstructionsMap
+      ? `\n\nCustom style instructions from the user:\n${Object.entries(styleInstructionsMap)
+          .filter(([, instructions]) => instructions)
+          .map(([style, instructions]) => `- ${style}: ${instructions}`)
+          .join('\n')}`
+      : '';
+
+    const response = await this.makeRequest(
+      [
+        {
+          role: 'user',
+          content: `You are helping someone with their journal entry. They have written the following so far:
+
+---
+${currentContent}
+---
+
+Your task:
+1. Analyze what they've written - the themes, emotions, what they seem to be processing
+2. Decide which prompt style would be most helpful to keep them writing:
+   - reflective: ${styleDescriptions.reflective}
+   - creative: ${styleDescriptions.creative}
+   - tactical: ${styleDescriptions.tactical}
+   - gratitude: ${styleDescriptions.gratitude}
+
+3. Generate a single follow-up question or prompt that:
+   - Directly relates to what they wrote
+   - Helps them go deeper or explore a new angle
+   - Uses the chosen style${customPromptsSection}${styleInstructionsSection}
+
+Return JSON with this exact structure:
+{
+  "chosenStyle": "reflective" | "creative" | "tactical" | "gratitude",
+  "reasoning": "1 sentence why you chose this style",
+  "prompt": "Your follow-up question or prompt"
+}
+
+The prompt should feel like a natural continuation of their writing, not a generic question.`,
+        },
+      ],
+      {
+        system:
+          'You are a skilled journaling coach. You read between the lines and ask questions that unlock deeper reflection. Your prompts are specific, personal, and never generic. Return valid JSON only.',
+        maxTokens: 300,
+      }
+    );
+
+    const textBlock = response.content.find((c) => c.type === 'text');
+
+    try {
+      const jsonMatch = textBlock?.text?.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found');
+
+      const data = JSON.parse(jsonMatch[0]);
+      return {
+        prompt: data.prompt || 'What else is on your mind?',
+        chosenStyle: data.chosenStyle || 'mixed',
+      };
+    } catch (error) {
+      console.error('Failed to parse follow-up prompt:', error);
+      return {
+        prompt: 'What else is on your mind?',
+        chosenStyle: 'mixed',
+      };
+    }
+  }
+
+  /**
    * Generate an AI reflection on a journal entry
    */
   async generateEntryReflection(

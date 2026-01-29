@@ -61,6 +61,7 @@ export function JournalEditor() {
     isConfigured: isAIConfigured,
     isGeneratingPrompt,
     generateContextualPrompt,
+    generateFollowUpPrompt,
   } = useClaudeAnalysis();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +77,7 @@ export function JournalEditor() {
   const [tagInput, setTagInput] = useState('');
   const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(getTodayPrompt());
   const [aiPrompt, setAiPrompt] = useState<string | null>(null);
+  const [aiPromptStyle, setAiPromptStyle] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(true); // Always show prompt initially
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -153,14 +155,27 @@ export function JournalEditor() {
 
   const refreshPrompt = async () => {
     if (isAIConfigured) {
-      const prompt = await generateContextualPrompt();
-      if (prompt) {
-        setAiPrompt(prompt);
-        return;
+      // If there's content, generate a contextual follow-up prompt
+      if (content.trim().length > 50) {
+        const result = await generateFollowUpPrompt(content);
+        if (result) {
+          setAiPrompt(result.prompt);
+          setAiPromptStyle(result.chosenStyle);
+          return;
+        }
+      } else {
+        // No content yet - generate an initial prompt
+        const prompt = await generateContextualPrompt();
+        if (prompt) {
+          setAiPrompt(prompt);
+          setAiPromptStyle(null);
+          return;
+        }
       }
     }
     // Fallback to local prompts
     setAiPrompt(null);
+    setAiPromptStyle(null);
     setCurrentPrompt(getRandomPrompt());
   };
 
@@ -351,8 +366,13 @@ export function JournalEditor() {
                       <Sparkles className="w-4 h-4 text-terracotta" />
                     )}
                     <span className="font-ui text-xs text-terracotta-dark uppercase tracking-wider">
-                      {aiPrompt ? 'AI Prompt' : 'Writing Prompt'}
+                      {aiPrompt ? (aiPromptStyle ? `${aiPromptStyle} prompt` : 'AI Prompt') : 'Writing Prompt'}
                     </span>
+                    {aiPromptStyle && (
+                      <span className="font-ui text-[10px] text-terracotta bg-terracotta-light/30 px-1.5 py-0.5 rounded capitalize">
+                        {aiPromptStyle}
+                      </span>
+                    )}
                     {isAIConfigured && !aiPrompt && (
                       <span className="font-ui text-[10px] text-ink-muted bg-warm-gray px-1.5 py-0.5 rounded">
                         AI available
