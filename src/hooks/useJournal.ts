@@ -8,6 +8,25 @@ function getSyncUserId(): string | null {
   return userId ? userId.toLowerCase().trim() : null;
 }
 
+// Normalize date string to YYYY-MM-DD format (strip time/timezone if present)
+// This fixes timezone issues where UTC midnight displays as previous day in local timezone
+function normalizeDate(dateStr: string): string {
+  if (!dateStr) return dateStr;
+  // If it contains 'T', it's an ISO timestamp - take just the date part
+  if (dateStr.includes('T')) {
+    return dateStr.split('T')[0];
+  }
+  return dateStr;
+}
+
+// Normalize all dates in a journal entry
+function normalizeEntryDates(entry: JournalEntry): JournalEntry {
+  return {
+    ...entry,
+    date: normalizeDate(entry.date),
+  };
+}
+
 interface UseJournalReturn {
   journalEntries: JournalEntry[];
   todayEntry: JournalEntry | null;
@@ -49,7 +68,9 @@ export function useJournal(): UseJournalReturn {
       }
 
       const data = await response.json();
-      setJournalEntries(data.entries || []);
+      // Normalize dates to prevent timezone issues
+      const normalizedEntries = (data.entries || []).map(normalizeEntryDates);
+      setJournalEntries(normalizedEntries);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch journal entries';
       setError(message);
@@ -87,7 +108,7 @@ export function useJournal(): UseJournalReturn {
       }
 
       const data = await response.json();
-      const newEntry = data.entry;
+      const newEntry = normalizeEntryDates(data.entry);
 
       // Update local state (upsert by date)
       setJournalEntries((prev) => {
@@ -132,8 +153,9 @@ export function useJournal(): UseJournalReturn {
       }
 
       const data = await response.json();
+      const updatedEntry = normalizeEntryDates(data.entry);
       setJournalEntries((prev) =>
-        prev.map((entry) => (entry.id === id ? data.entry : entry))
+        prev.map((entry) => (entry.id === id ? updatedEntry : entry))
       );
     } catch (err) {
       // Revert on error
