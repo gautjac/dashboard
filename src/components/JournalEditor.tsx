@@ -56,7 +56,7 @@ export function JournalEditor() {
   const { settings } = useSettings();
 
   // UI state from store
-  const { setJournalEditorOpen } = useDashboardStore();
+  const { setJournalEditorOpen, journalEditorInitialPrompt } = useDashboardStore();
 
   const {
     isConfigured: isAIConfigured,
@@ -108,19 +108,24 @@ export function JournalEditor() {
   const [energy, setEnergy] = useState<number | undefined>(todayEntry?.energy);
   const [tags, setTags] = useState<string[]>(todayEntry?.tags || []);
   const [tagInput, setTagInput] = useState('');
-  const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(getTodayPrompt());
+  // Initialize prompt from store (passed from JournalWidget) or fall back to defaults
+  const getInitialPrompt = (): JournalPrompt => {
+    if (journalEditorInitialPrompt) {
+      return {
+        id: 'passed-from-widget',
+        text: journalEditorInitialPrompt,
+        category: 'reflective',
+      };
+    }
+    return getTodaysCustomPrompt();
+  };
+
+  const [currentPrompt, setCurrentPrompt] = useState<JournalPrompt>(getInitialPrompt);
   const [aiPrompt, setAiPrompt] = useState<string | null>(null);
   const [aiPromptStyle, setAiPromptStyle] = useState<string | null>(null);
   const [showPrompt, setShowPrompt] = useState(true); // Always show prompt initially
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-
-  // Set initial prompt based on custom prompts (after settings load)
-  useEffect(() => {
-    if (settings.customJournalPrompts && settings.customJournalPrompts.length > 0) {
-      setCurrentPrompt(getTodaysCustomPrompt());
-    }
-  }, [settings.customJournalPrompts]);
 
   // Calculate word count
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;

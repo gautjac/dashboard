@@ -38,6 +38,7 @@ interface DashboardStore {
   currentView: 'dashboard' | 'journal' | 'habits' | 'insights' | 'settings';
   selectedDate: string;
   journalEditorOpen: boolean;
+  journalEditorInitialPrompt: string | null;
   settingsOpen: boolean;
 
   // Habit Actions
@@ -97,7 +98,7 @@ interface DashboardStore {
   // UI Actions
   setCurrentView: (view: DashboardStore['currentView']) => void;
   setSelectedDate: (date: string) => void;
-  setJournalEditorOpen: (open: boolean) => void;
+  setJournalEditorOpen: (open: boolean, initialPrompt?: string | null) => void;
   setSettingsOpen: (open: boolean) => void;
 
   // Sync State & Actions
@@ -210,6 +211,7 @@ export const useDashboardStore = create<DashboardStore>()(
       currentView: 'dashboard',
       selectedDate: today(),
       journalEditorOpen: false,
+      journalEditorInitialPrompt: null,
       settingsOpen: false,
 
       // Habit Actions
@@ -587,7 +589,10 @@ export const useDashboardStore = create<DashboardStore>()(
       // UI Actions
       setCurrentView: (view) => set({ currentView: view }),
       setSelectedDate: (date) => set({ selectedDate: date }),
-      setJournalEditorOpen: (open) => set({ journalEditorOpen: open }),
+      setJournalEditorOpen: (open, initialPrompt = null) => set({
+        journalEditorOpen: open,
+        journalEditorInitialPrompt: open ? initialPrompt : null
+      }),
       setSettingsOpen: (open) => set({ settingsOpen: open }),
 
       // Sync State & Actions

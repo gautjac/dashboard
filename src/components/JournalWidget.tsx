@@ -146,7 +146,7 @@ export function JournalWidget() {
         </button>
         {isCollapsed ? (
           <button
-            onClick={() => setJournalEditorOpen(true)}
+            onClick={() => setJournalEditorOpen(true, currentPrompt.text)}
             className="btn-ghost p-1.5 rounded-lg text-ink-muted hover:text-ink"
             title="Write"
           >
@@ -154,7 +154,7 @@ export function JournalWidget() {
           </button>
         ) : (
           <button
-            onClick={() => setJournalEditorOpen(true)}
+            onClick={() => setJournalEditorOpen(true, currentPrompt.text)}
             className="btn btn-primary text-sm py-2 px-3"
           >
             <Pencil className="w-4 h-4" />
@@ -211,7 +211,7 @@ export function JournalWidget() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setJournalEditorOpen(true)}
+                  onClick={() => setJournalEditorOpen(true, currentPrompt.text)}
                   className="w-full text-left p-3 rounded-lg bg-warm-gray/30 hover:bg-warm-gray/50 transition-colors group"
                 >
                   <p className="font-body text-sm text-ink-light line-clamp-3">
@@ -229,7 +229,7 @@ export function JournalWidget() {
                   No entry yet today
                 </p>
                 <button
-                  onClick={() => setJournalEditorOpen(true)}
+                  onClick={() => setJournalEditorOpen(true, currentPrompt.text)}
                   className="mt-2 font-ui text-sm text-terracotta hover:text-terracotta-dark transition-colors"
                 >
                   Start writing
