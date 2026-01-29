@@ -4,7 +4,7 @@ import { jsonResponse, errorResponse } from './utils/db';
 const PERPLEXITY_API_URL = 'https://api.perplexity.ai/chat/completions';
 
 interface PerplexityRequest {
-  action?: 'generateBrief' | 'enhanceArticle' | 'generateJournalPrompt' | 'generateFollowUpPrompt';
+  action?: 'generateBrief' | 'enhanceArticle' | 'generateJournalPrompt' | 'generateFollowUpPrompt' | 'generateWeeklyInsights' | 'generateEntryReflection';
   interests: { name: string; keywords: string[] }[];
   briefLength: 'short' | 'medium' | 'long';
   apiKey: string;
@@ -15,12 +15,15 @@ interface PerplexityRequest {
     topic: string;
   };
   // Journal prompt fields
-  recentEntries?: { content: string; date: string }[];
-  habits?: { name: string; currentStreak: number; completionRate7Days: number }[];
+  recentEntries?: { content: string; date: string; mood?: number; energy?: number; tags?: string[] }[];
+  habits?: { name: string; currentStreak: number; completionRate7Days: number; bestStreak?: number }[];
   promptStyle?: string;
   styleInstructions?: Record<string, string>;
   currentContent?: string;
   customPrompts?: string[];
+  // Entry reflection fields
+  entry?: { content: string; date: string; mood?: number; energy?: number; tags?: string[] };
+  otherEntries?: { content: string; date: string }[];
 }
 
 export default async function handler(req: Request, _context: Context) {
@@ -250,6 +253,187 @@ Return ONLY valid JSON, nothing else.`
         prompt: responseText.trim(),
         chosenStyle: 'mixed'
       });
+    }
+
+    // Handle weekly insights generation
+    if (action === 'generateWeeklyInsights') {
+      const { recentEntries, habits } = body as PerplexityRequest;
+      console.log('Generating weekly insights');
+
+      // Build journal context
+      let journalContext = '';
+      if (recentEntries && recentEntries.length > 0) {
+        journalContext = recentEntries
+          .slice(0, 7)
+          .map(e => {
+            let entry = `[${e.date}]`;
+            if (e.mood) entry += ` Mood: ${e.mood}/5`;
+            if (e.energy) entry += ` Energy: ${e.energy}/5`;
+            if (e.tags && e.tags.length > 0) entry += ` Tags: ${e.tags.join(', ')}`;
+            entry += `\n${e.content.slice(0, 400)}...`;
+            return entry;
+          })
+          .join('\n\n');
+      }
+
+      // Build habits context
+      let habitsContext = '';
+      if (habits && habits.length > 0) {
+        habitsContext = habits
+          .map(h => `- ${h.name}: ${h.currentStreak} day streak, ${h.completionRate7Days}% completion this week${h.bestStreak ? `, best: ${h.bestStreak} days` : ''}`)
+          .join('\n');
+      }
+
+      const insightsResponse = await fetch(PERPLEXITY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sanitizedApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'sonar',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a thoughtful life coach and wellness advisor. Analyze journal entries and habit data to provide meaningful weekly insights. Be supportive, specific, and actionable.`
+            },
+            {
+              role: 'user',
+              content: `Analyze this week's journal entries and habits to generate insights:
+
+${journalContext ? `JOURNAL ENTRIES:\n${journalContext}\n\n` : 'No journal entries this week.\n\n'}${habitsContext ? `HABITS:\n${habitsContext}\n\n` : 'No habit data available.\n\n'}
+Generate a weekly reflection with:
+1. A brief summary of the week (2-3 sentences)
+2. Key themes or patterns you noticed (2-3 themes)
+3. Wins or positive moments to celebrate (1-2 items)
+4. Areas for growth or attention (1-2 items)
+5. One actionable suggestion for next week
+
+Return as JSON:
+{
+  "summary": "Brief week summary",
+  "themes": ["theme1", "theme2"],
+  "wins": ["win1", "win2"],
+  "growthAreas": ["area1"],
+  "suggestion": "Actionable suggestion",
+  "moodTrend": "improving|stable|declining|mixed",
+  "energyTrend": "improving|stable|declining|mixed"
+}
+
+Return ONLY valid JSON.`
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 800
+        }),
+      });
+
+      if (!insightsResponse.ok) {
+        const errorText = await insightsResponse.text();
+        console.error('Perplexity insights error:', insightsResponse.status, errorText);
+        return errorResponse('Failed to generate insights', insightsResponse.status);
+      }
+
+      const insightsData = await insightsResponse.json();
+      const insightsText = insightsData.choices?.[0]?.message?.content || '';
+
+      // Parse the JSON response
+      try {
+        const jsonMatch = insightsText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return jsonResponse({
+            id: `insight-${Date.now()}`,
+            weekStart: new Date().toISOString().split('T')[0],
+            ...parsed,
+            generatedAt: new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.error('Failed to parse insights response:', e);
+      }
+
+      // Fallback
+      return jsonResponse({
+        id: `insight-${Date.now()}`,
+        weekStart: new Date().toISOString().split('T')[0],
+        summary: insightsText.trim(),
+        themes: [],
+        wins: [],
+        growthAreas: [],
+        suggestion: '',
+        generatedAt: new Date().toISOString()
+      });
+    }
+
+    // Handle entry reflection generation
+    if (action === 'generateEntryReflection') {
+      const { entry, otherEntries, styleInstructions } = body as PerplexityRequest;
+      console.log('Generating entry reflection');
+
+      if (!entry || !entry.content) {
+        return errorResponse('Entry content is required', 400);
+      }
+
+      // Build context from other entries
+      let contextEntries = '';
+      if (otherEntries && otherEntries.length > 0) {
+        contextEntries = otherEntries
+          .slice(0, 3)
+          .map(e => `[${e.date}]: ${e.content.slice(0, 200)}...`)
+          .join('\n\n');
+      }
+
+      const reflectionResponse = await fetch(PERPLEXITY_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sanitizedApiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'sonar',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a thoughtful journaling companion. Provide brief, meaningful reflections on journal entries. Be supportive, insightful, and help the person see patterns or new perspectives.`
+            },
+            {
+              role: 'user',
+              content: `Reflect on this journal entry:
+
+Date: ${entry.date}
+${entry.mood ? `Mood: ${entry.mood}/5` : ''}
+${entry.energy ? `Energy: ${entry.energy}/5` : ''}
+${entry.tags && entry.tags.length > 0 ? `Tags: ${entry.tags.join(', ')}` : ''}
+
+Entry:
+${entry.content}
+
+${contextEntries ? `\nFor context, here are some recent entries:\n${contextEntries}\n` : ''}
+Write a brief reflection (2-3 sentences) that:
+- Acknowledges what they've shared
+- Offers a new perspective or insight
+- Connects to patterns if visible in other entries
+- Is warm and supportive
+
+Return ONLY the reflection text, nothing else.`
+            }
+          ],
+          temperature: 0.6,
+          max_tokens: 250
+        }),
+      });
+
+      if (!reflectionResponse.ok) {
+        const errorText = await reflectionResponse.text();
+        console.error('Perplexity reflection error:', reflectionResponse.status, errorText);
+        return errorResponse('Failed to generate reflection', reflectionResponse.status);
+      }
+
+      const reflectionData = await reflectionResponse.json();
+      const reflection = reflectionData.choices?.[0]?.message?.content || '';
+
+      return jsonResponse({ reflection: reflection.trim() });
     }
 
     const enabledInterests = interests.filter(i => i.keywords && i.keywords.length > 0);
