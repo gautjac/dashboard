@@ -41,10 +41,15 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
   const [isGeneratingReflection, setIsGeneratingReflection] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isConfigured = anthropicService.isConfigured();
+  // For prompts, we now use Perplexity (same key as daily brief)
+  const isPromptConfigured = !!settings.perplexityApiKey;
+  // For other features (insights, reflections), still use Anthropic
+  const isAnthropicConfigured = anthropicService.isConfigured();
+  // isConfigured returns true if either is available (for backward compat)
+  const isConfigured = isPromptConfigured || isAnthropicConfigured;
 
   const generateWeeklyInsights = useCallback(async (): Promise<WeeklyInsight | null> => {
-    if (!isConfigured) {
+    if (!isAnthropicConfigured) {
       setError('Anthropic API key not configured');
       return null;
     }
@@ -71,7 +76,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingInsights(false);
     }
-  }, [isConfigured, journalEntries, habitsWithStats]);
+  }, [isAnthropicConfigured, journalEntries, habitsWithStats]);
 
   const generateDailyBrief = useCallback(async (): Promise<DailyBrief | null> => {
     setIsGeneratingBrief(true);
@@ -171,8 +176,8 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
   }, [interestAreas, settings.dailyBriefLength, settings.perplexityApiKey, setDailyBrief, isConfigured]);
 
   const generateContextualPrompt = useCallback(async (): Promise<string | null> => {
-    if (!isConfigured) {
-      setError('Anthropic API key not configured');
+    if (!isPromptConfigured) {
+      setError('Perplexity API key not configured');
       return null;
     }
 
@@ -180,14 +185,42 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     setError(null);
 
     try {
-      const prompt = await anthropicService.generateContextualPrompt(
-        journalEntries.slice(0, 5),
-        habitsWithStats,
-        settings.journalPromptStyle,
-        settings.journalPromptInstructions // Now passes the full style-specific instructions map
-      );
+      // Call Perplexity endpoint for journal prompts
+      const response = await fetch('/.netlify/functions/perplexity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generateJournalPrompt',
+          apiKey: settings.perplexityApiKey,
+          recentEntries: journalEntries.slice(0, 5).map(e => ({
+            content: e.content,
+            date: e.date
+          })),
+          habits: habitsWithStats.map(h => ({
+            name: h.name,
+            currentStreak: h.currentStreak,
+            completionRate7Days: h.completionRate7Days
+          })),
+          promptStyle: settings.journalPromptStyle,
+          styleInstructions: settings.journalPromptInstructions,
+          interests: [] // Not needed for this action
+        })
+      });
 
-      return prompt;
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMsg = 'Failed to generate prompt';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMsg = errorJson.error || errorMsg;
+        } catch {
+          // Use default message
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+      return data.prompt || null;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate prompt';
       setError(message);
@@ -195,13 +228,13 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [isConfigured, journalEntries, habitsWithStats, settings.journalPromptStyle, settings.journalPromptInstructions]);
+  }, [isPromptConfigured, journalEntries, habitsWithStats, settings.perplexityApiKey, settings.journalPromptStyle, settings.journalPromptInstructions]);
 
   const generateFollowUpPrompt = useCallback(async (
     currentContent: string
   ): Promise<{ prompt: string; chosenStyle: string } | null> => {
-    if (!isConfigured) {
-      setError('Anthropic API key not configured');
+    if (!isPromptConfigured) {
+      setError('Perplexity API key not configured');
       return null;
     }
 
@@ -214,13 +247,37 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     setError(null);
 
     try {
-      const result = await anthropicService.generateFollowUpPrompt(
-        currentContent,
-        settings.customJournalPrompts || [],
-        settings.journalPromptInstructions
-      );
+      // Call Perplexity endpoint for follow-up prompts
+      const response = await fetch('/.netlify/functions/perplexity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generateFollowUpPrompt',
+          apiKey: settings.perplexityApiKey,
+          currentContent,
+          customPrompts: settings.customJournalPrompts || [],
+          styleInstructions: settings.journalPromptInstructions,
+          interests: [] // Not needed for this action
+        })
+      });
 
-      return result;
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMsg = 'Failed to generate follow-up prompt';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMsg = errorJson.error || errorMsg;
+        } catch {
+          // Use default message
+        }
+        throw new Error(errorMsg);
+      }
+
+      const data = await response.json();
+      return {
+        prompt: data.prompt || '',
+        chosenStyle: data.chosenStyle || 'mixed'
+      };
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to generate follow-up prompt';
       setError(message);
@@ -228,11 +285,11 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [isConfigured, settings.customJournalPrompts, settings.journalPromptInstructions]);
+  }, [isPromptConfigured, settings.perplexityApiKey, settings.customJournalPrompts, settings.journalPromptInstructions]);
 
   const generateEntryReflection = useCallback(
     async (entryId: string): Promise<string | null> => {
-      if (!isConfigured) {
+      if (!isAnthropicConfigured) {
         setError('Anthropic API key not configured');
         return null;
       }
@@ -269,7 +326,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
         setIsGeneratingReflection(false);
       }
     },
-    [isConfigured, journalEntries, settings.journalPromptInstructions]
+    [isAnthropicConfigured, journalEntries, settings.journalPromptInstructions]
   );
 
   const clearError = useCallback(() => {
