@@ -41,6 +41,10 @@ interface DashboardStore {
   journalEditorInitialPrompt: string | null;
   settingsOpen: boolean;
 
+  // Refresh triggers (increment to trigger refetch in hooks)
+  journalRefreshTrigger: number;
+  triggerJournalRefresh: () => void;
+
   // Habit Actions
   addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => void;
   updateHabit: (id: string, updates: Partial<Habit>) => void;
@@ -213,6 +217,10 @@ export const useDashboardStore = create<DashboardStore>()(
       journalEditorOpen: false,
       journalEditorInitialPrompt: null,
       settingsOpen: false,
+
+      // Refresh triggers
+      journalRefreshTrigger: 0,
+      triggerJournalRefresh: () => set((state) => ({ journalRefreshTrigger: state.journalRefreshTrigger + 1 })),
 
       // Habit Actions
       addHabit: (habit) => {
@@ -733,6 +741,7 @@ export const useDashboardStore = create<DashboardStore>()(
         weeklyReflections: state.weeklyReflections,
         settings: state.settings,
         syncEnabled: state.syncEnabled,
+        dailyImage: state.dailyImage,
       }),
     }
   )

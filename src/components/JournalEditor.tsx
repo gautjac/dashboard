@@ -56,13 +56,14 @@ export function JournalEditor() {
   const { settings } = useSettings();
 
   // UI state from store
-  const { setJournalEditorOpen, journalEditorInitialPrompt } = useDashboardStore();
+  const { setJournalEditorOpen, journalEditorInitialPrompt, triggerJournalRefresh } = useDashboardStore();
 
   const {
     isConfigured: isAIConfigured,
     isGeneratingPrompt,
     generateContextualPrompt,
     generateFollowUpPrompt,
+    error: aiError,
   } = useClaudeAnalysis();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -177,6 +178,9 @@ export function JournalEditor() {
         setHabitValue(writeHabit.id, wordCount);
       }
 
+      // Trigger refresh so other components (JournalWidget) see the update
+      triggerJournalRefresh();
+
       setLastSaved(new Date());
 
       if (closeAfter) {
@@ -199,24 +203,34 @@ export function JournalEditor() {
   };
 
   const refreshPrompt = async () => {
+    console.log('[refreshPrompt] isAIConfigured:', isAIConfigured, 'content length:', content.trim().length);
+
     if (isAIConfigured) {
       // If there's content, generate a contextual follow-up prompt
       if (content.trim().length > 50) {
+        console.log('[refreshPrompt] Calling generateFollowUpPrompt...');
         const result = await generateFollowUpPrompt(content);
+        console.log('[refreshPrompt] Follow-up result:', result);
         if (result) {
           setAiPrompt(result.prompt);
           setAiPromptStyle(result.chosenStyle);
           return;
         }
+        // If result is null, there was an error - check aiError state
+        console.log('[refreshPrompt] No result, aiError:', aiError);
       } else {
         // No content yet - generate an initial prompt
+        console.log('[refreshPrompt] Calling generateContextualPrompt...');
         const prompt = await generateContextualPrompt();
+        console.log('[refreshPrompt] Contextual result:', prompt);
         if (prompt) {
           setAiPrompt(prompt);
           setAiPromptStyle(null);
           return;
         }
       }
+    } else {
+      console.log('[refreshPrompt] AI not configured, using fallback');
     }
     // Fallback to local prompts (use custom if available)
     setAiPrompt(null);
@@ -439,6 +453,11 @@ export function JournalEditor() {
                 ) : (
                   <p className="font-display text-lg text-ink mt-2">
                     {displayedPrompt}
+                  </p>
+                )}
+                {aiError && (
+                  <p className="font-ui text-xs text-red-500 mt-1">
+                    AI Error: {aiError}
                   </p>
                 )}
                 {/* Prompt action buttons */}

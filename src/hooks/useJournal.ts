@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
+import { useDashboardStore } from '../store';
 import type { JournalEntry } from '../types';
 
 // Get user ID from localStorage
@@ -45,6 +46,9 @@ export function useJournal(): UseJournalReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Watch refresh trigger from store to sync across hook instances
+  const journalRefreshTrigger = useDashboardStore((state) => state.journalRefreshTrigger);
+
   const syncEnabled = !!getSyncUserId();
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -80,10 +84,10 @@ export function useJournal(): UseJournalReturn {
     }
   }, []);
 
-  // Fetch on mount
+  // Fetch on mount and when refresh trigger changes
   useEffect(() => {
     fetchJournalEntries();
-  }, [fetchJournalEntries]);
+  }, [fetchJournalEntries, journalRefreshTrigger]);
 
   const addJournalEntry = useCallback(async (
     entry: Omit<JournalEntry, 'id' | 'createdAt' | 'updatedAt'>
