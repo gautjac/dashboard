@@ -101,7 +101,7 @@ export function JournalEditor() {
     }
   }, [content]);
 
-  const handleSave = (closeAfter = false) => {
+  const handleSave = async (closeAfter = false) => {
     if (!content.trim()) return;
 
     setIsSaving(true);
@@ -115,27 +115,32 @@ export function JournalEditor() {
       promptUsed: showPrompt ? displayedPrompt : undefined,
     };
 
-    if (todayEntry) {
-      updateJournalEntry(todayEntry.id, entryData);
-    } else {
-      addJournalEntry(entryData);
-    }
+    try {
+      if (todayEntry) {
+        await updateJournalEntry(todayEntry.id, entryData);
+      } else {
+        await addJournalEntry(entryData);
+      }
 
-    // Update "write" habit with word count
-    const writeHabit = habits.find(
-      (h) => h.name.toLowerCase() === 'write' && h.targetType === 'numeric'
-    );
-    if (writeHabit) {
-      setHabitValue(writeHabit.id, wordCount);
-    }
+      // Update "write" habit with word count
+      const writeHabit = habits.find(
+        (h) => h.name.toLowerCase() === 'write' && h.targetType === 'numeric'
+      );
+      if (writeHabit) {
+        setHabitValue(writeHabit.id, wordCount);
+      }
 
-    setLastSaved(new Date());
-    setTimeout(() => {
-      setIsSaving(false);
+      setLastSaved(new Date());
+
       if (closeAfter) {
         setJournalEditorOpen(false);
       }
-    }, 300);
+    } catch (err) {
+      console.error('Failed to save journal entry:', err);
+      alert('Failed to save journal entry. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClose = () => {

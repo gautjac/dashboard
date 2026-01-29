@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
 import { anthropicService } from '../services/anthropic';
 import { useDashboardStore } from '../store';
+import { useSettings } from './useSettings';
+import { useJournal } from './useJournal';
+import { useHabits } from './useHabits';
+import { useInterestAreas } from './useInterestAreas';
 import type { WeeklyInsight, DailyBrief } from '../types';
 
 interface UseClaudeAnalysisReturn {
@@ -21,13 +25,14 @@ interface UseClaudeAnalysisReturn {
 }
 
 export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
-  const {
-    journalEntries,
-    getHabitsWithStats,
-    interestAreas,
-    settings,
-    setDailyBrief,
-  } = useDashboardStore();
+  // DB-first hooks for data
+  const { settings } = useSettings();
+  const { journalEntries } = useJournal();
+  const { habitsWithStats } = useHabits();
+  const { interestAreas } = useInterestAreas();
+
+  // Store for actions
+  const { setDailyBrief } = useDashboardStore();
 
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [isGeneratingBrief, setIsGeneratingBrief] = useState(false);
@@ -47,10 +52,9 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     setError(null);
 
     try {
-      const habits = getHabitsWithStats();
       const insights = await anthropicService.generateWeeklyInsights(
         journalEntries,
-        habits
+        habitsWithStats
       );
 
       // Store the insights
@@ -66,7 +70,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingInsights(false);
     }
-  }, [isConfigured, journalEntries, getHabitsWithStats]);
+  }, [isConfigured, journalEntries, habitsWithStats]);
 
   const generateDailyBrief = useCallback(async (): Promise<DailyBrief | null> => {
     setIsGeneratingBrief(true);
@@ -175,10 +179,9 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     setError(null);
 
     try {
-      const habits = getHabitsWithStats();
       const prompt = await anthropicService.generateContextualPrompt(
         journalEntries.slice(0, 5),
-        habits,
+        habitsWithStats,
         settings.journalPromptStyle,
         settings.journalPromptInstructions // Now passes the full style-specific instructions map
       );
@@ -191,7 +194,7 @@ export function useClaudeAnalysis(): UseClaudeAnalysisReturn {
     } finally {
       setIsGeneratingPrompt(false);
     }
-  }, [isConfigured, journalEntries, getHabitsWithStats, settings.journalPromptStyle, settings.journalPromptInstructions]);
+  }, [isConfigured, journalEntries, habitsWithStats, settings.journalPromptStyle, settings.journalPromptInstructions]);
 
   const generateEntryReflection = useCallback(
     async (entryId: string): Promise<string | null> => {
