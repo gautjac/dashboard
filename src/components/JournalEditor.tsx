@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useDashboardStore } from '../store';
-import { useClaudeAnalysis, useJournal, useHabits } from '../hooks';
+import { useClaudeAnalysis, useJournal, useHabits, useSettings } from '../hooks';
 import { getTodayPrompt, getRandomPrompt } from '../data/sampleData';
 import type { JournalPrompt } from '../types';
 
@@ -53,6 +53,7 @@ export function JournalEditor() {
   // DB-first hooks
   const { todayEntry, addJournalEntry, updateJournalEntry } = useJournal();
   const { habits, setHabitValue } = useHabits();
+  const { settings } = useSettings();
 
   // UI state from store
   const { setJournalEditorOpen } = useDashboardStore();
@@ -65,6 +66,38 @@ export function JournalEditor() {
   } = useClaudeAnalysis();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Helper to get today's custom prompt (same logic as JournalWidget)
+  const getTodaysCustomPrompt = (): JournalPrompt => {
+    const customPrompts = settings.customJournalPrompts;
+    if (customPrompts && customPrompts.length > 0) {
+      const dayOfYear = Math.floor(
+        (new Date().getTime() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      const index = dayOfYear % customPrompts.length;
+      return {
+        id: `custom-${index}`,
+        text: customPrompts[index],
+        category: 'reflective',
+      };
+    }
+    return getTodayPrompt();
+  };
+
+  // Helper to get random custom or default prompt
+  const getCustomOrDefaultPrompt = (): JournalPrompt => {
+    const customPrompts = settings.customJournalPrompts;
+    if (customPrompts && customPrompts.length > 0) {
+      const randomIndex = Math.floor(Math.random() * customPrompts.length);
+      return {
+        id: `custom-${randomIndex}`,
+        text: customPrompts[randomIndex],
+        category: 'reflective',
+      };
+    }
+    return getRandomPrompt();
+  };
 
   // Step tracking: 'mood' for mood selection, 'editor' for main editor
   // Skip mood step if entry already exists
@@ -81,6 +114,13 @@ export function JournalEditor() {
   const [showPrompt, setShowPrompt] = useState(true); // Always show prompt initially
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+  // Set initial prompt based on custom prompts (after settings load)
+  useEffect(() => {
+    if (settings.customJournalPrompts && settings.customJournalPrompts.length > 0) {
+      setCurrentPrompt(getTodaysCustomPrompt());
+    }
+  }, [settings.customJournalPrompts]);
 
   // Calculate word count
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
@@ -173,10 +213,10 @@ export function JournalEditor() {
         }
       }
     }
-    // Fallback to local prompts
+    // Fallback to local prompts (use custom if available)
     setAiPrompt(null);
     setAiPromptStyle(null);
-    setCurrentPrompt(getRandomPrompt());
+    setCurrentPrompt(getCustomOrDefaultPrompt());
   };
 
   const displayedPrompt = aiPrompt || currentPrompt.text;
